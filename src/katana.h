@@ -99,12 +99,11 @@ typedef struct {
         i16 samples[KATANA_MAX_AUDIO_SAMPLE_COUNT_PER_FRAME];
         u32 sample_count;
         u32 samples_per_second;
-} game_audio_output_t;
+} game_audio_t;
 
 typedef struct {
         game_controller_output_t controllers[KATANA_MAX_CONTROLLERS];
-        game_audio_output_t audio;
 } game_output_t;
 
-void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_buffer, game_input_t *input,
-                            game_output_t *output);
+void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_buffer, game_audio_t *audio,
+                            game_input_t *input, game_output_t *output);

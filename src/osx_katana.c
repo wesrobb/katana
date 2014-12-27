@@ -19,7 +19,8 @@
 SDL_GameController *controller_handles[KATANA_MAX_CONTROLLERS];
 SDL_Haptic *haptic_handles[KATANA_MAX_CONTROLLERS];
 
-typedef void (*game_update_and_render_fn_t)(game_memory_t *, game_frame_buffer_t *, game_input_t *, game_output_t *);
+typedef void (*game_update_and_render_fn_t)(game_memory_t *, game_frame_buffer_t *, game_audio_t *, game_input_t *,
+                                            game_output_t *);
 
 typedef struct {
         char *so;
@@ -248,8 +249,10 @@ int main(void)
         game_input_t *old_input = &input[1];
 
         game_output_t output = {};
-        output.audio.samples_per_second = audio_spec_want.freq;
-        output.audio.sample_count = audio_spec_want.samples;
+
+        game_audio_t audio;
+        audio.samples_per_second = audio_spec_want.freq;
+        audio.sample_count = audio_spec_want.samples;
 
         osx_game_record_t game_record = {};
         game_record.input_events = mmap(0, sizeof(game_input_t) * KATANA_MAX_RECORDED_INPUT_EVENTS,
@@ -321,9 +324,9 @@ int main(void)
                 // SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
                 // SDL_RenderClear(renderer);
 
-                game.update_and_render_fn(&game_memory, &frame_buffer, new_input, &output);
+                game.update_and_render_fn(&game_memory, &frame_buffer, &audio, new_input, &output);
 
-                SDL_QueueAudio(audio_device, (void *)output.audio.samples, output.audio.sample_count * sizeof(i16));
+                SDL_QueueAudio(audio_device, (void *)audio.samples, audio.sample_count * sizeof(i16));
                 u32 queued_audio_size = SDL_GetQueuedAudioSize(audio_device);
 
                 for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
