@@ -1,4 +1,6 @@
 build
+tags
+cscope.out
 
 *.swp
 *.pyc

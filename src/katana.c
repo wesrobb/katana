@@ -1,5 +1,30 @@
 #include "katana.h"
 
+#include <math.h>
+
+static void output_sine_wave(game_state_t *game_state, game_audio_output_t *audio)
+{
+        i16 tone_volume = 3000;
+        i32 wave_period = audio->samples_per_second / game_state->tone_hz;
+
+        i16 *sample_out = audio->samples;
+        for (u32 i = 0; i < audio->sample_count; ++i) {
+#if 1
+                f32 sine_val = sinf(game_state->t_sine);
+                i16 sample_val = (i16)(sine_val * tone_volume);
+#else
+                int16 SampleValue = 0;
+#endif
+                *sample_out++ = sample_val;
+
+                const f32 pi = 3.14159265359f;
+                game_state->t_sine += 2.0f * pi * 1.0f / (f32)wave_period;
+                if (game_state->t_sine > 2.0f * pi) {
+                        game_state->t_sine -= 2.0f * pi;
+                }
+        }
+}
+
 static void render_weird_gradient(game_frame_buffer_t *frame_buffer, i32 blue_offset, i32 green_offset)
 {
         // TODO(casey): Let's see what the optimizer does
@@ -20,8 +45,8 @@ static void render_weird_gradient(game_frame_buffer_t *frame_buffer, i32 blue_of
 
 static void draw_block(i32 x, i32 y, game_frame_buffer_t *frame_buffer)
 {
-        i32 right = x + 30;
-        i32 top = y + 30;
+        i32 right = x + 50;
+        i32 top = y + 50;
         u32 color = 0xFFFFFFFF;
         for (i32 i = x; i < right; ++i) {
                 for (i32 j = y; j < top; ++j) {
@@ -40,11 +65,12 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
         render_weird_gradient(frame_buffer, 200, 10);
 
         game_state_t *game_state = (game_state_t *)memory->transient_store;
-        static i32 first_time = 1;
-        if (first_time) {
+        if (!memory->is_initialized) {
                 game_state->block_x = 100;
                 game_state->block_y = 50;
-                first_time = 0;
+                game_state->t_sine = 0.0f;
+                game_state->tone_hz = 512;
+                memory->is_initialized = 1;
         }
         u32 stick_value_count = input->controllers[0].stick_value_count;
         for (u32 i = 0; i < stick_value_count; ++i) {
@@ -61,4 +87,5 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
         }
 
         draw_block(game_state->block_x, game_state->block_y, frame_buffer);
+        output_sine_wave(game_state, &output->audio);
 }

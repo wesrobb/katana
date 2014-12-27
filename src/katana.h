@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#define KATANA_TARGET_FPS 60
+
 typedef unsigned char b8;
 typedef int8_t i8;
 typedef uint8_t u8;
@@ -20,11 +22,16 @@ typedef struct {
 
         void *permanent_store;
         u64 permanent_store_size;
+
+        b8 is_initialized;
 } game_memory_t;
 
 typedef struct {
         i32 block_x;
         i32 block_y;
+
+        f32 t_sine;
+        i32 tone_hz;
 } game_state_t;
 
 typedef struct {
@@ -87,8 +94,16 @@ typedef struct {
         f32 intensity;
 } game_controller_output_t;
 
+#define KATANA_MAX_AUDIO_SAMPLE_COUNT_PER_FRAME 8192
+typedef struct {
+        i16 samples[KATANA_MAX_AUDIO_SAMPLE_COUNT_PER_FRAME];
+        u32 sample_count;
+        u32 samples_per_second;
+} game_audio_output_t;
+
 typedef struct {
         game_controller_output_t controllers[KATANA_MAX_CONTROLLERS];
+        game_audio_output_t audio;
 } game_output_t;
 
 void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_buffer, game_input_t *input,

@@ -16,8 +16,6 @@
 #define Gigabytes(Value) (Megabytes(Value) * 1024LL)
 #define Terabytes(Value) (Gigabytes(Value) * 1024LL)
 
-int quitting = 0;
-
 SDL_GameController *controller_handles[KATANA_MAX_CONTROLLERS];
 SDL_Haptic *haptic_handles[KATANA_MAX_CONTROLLERS];
 
@@ -179,7 +177,7 @@ static void osx_copy_game_memory(game_memory_t *dst, game_memory_t *src)
 
 int main(void)
 {
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC) != 0) {
+        if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
                 // TODO(Wes): SDL_Init didn't work!
         }
 
@@ -192,6 +190,18 @@ int main(void)
 
         SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING,
                                                  window_width, window_height);
+
+        SDL_AudioSpec audio_spec_want = {};
+        audio_spec_want.freq = 48000;
+        audio_spec_want.format = AUDIO_S16LSB;
+        audio_spec_want.channels = 2;
+        audio_spec_want.samples = (audio_spec_want.freq / 60) * audio_spec_want.channels;
+
+        SDL_AudioDeviceID audio_device = SDL_OpenAudioDevice(0, 0, &audio_spec_want, 0, 0);
+        if (audio_device == 0) {
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Failed to open audio device: %s", SDL_GetError());
+                return -1;
+        }
 
         game_memory_t game_memory = osx_allocate_game_memory((void *)Terabytes(2));
 
@@ -238,6 +248,8 @@ int main(void)
         game_input_t *old_input = &input[1];
 
         game_output_t output = {};
+        output.audio.samples_per_second = audio_spec_want.freq;
+        output.audio.sample_count = audio_spec_want.samples;
 
         osx_game_record_t game_record = {};
         game_record.input_events = mmap(0, sizeof(game_input_t) * KATANA_MAX_RECORDED_INPUT_EVENTS,
@@ -250,6 +262,8 @@ int main(void)
         SDL_Event event;
         b8 recording = false;
         b8 playing_back = false;
+        b8 quitting = 0;
+        SDL_PauseAudioDevice(audio_device, 0);
         while (!quitting) {
                 while (SDL_PollEvent(&event)) {
                         switch (event.type) {
@@ -275,6 +289,9 @@ int main(void)
                                         } else {
                                                 playing_back = 1;
                                         }
+                                }
+                                if (event.key.keysym.sym == SDLK_ESCAPE) {
+                                        quitting = 1;
                                 }
                         }
                 }
@@ -306,6 +323,9 @@ int main(void)
 
                 game.update_and_render_fn(&game_memory, &frame_buffer, new_input, &output);
 
+                SDL_QueueAudio(audio_device, (void *)output.audio.samples, output.audio.sample_count * sizeof(i16));
+                u32 queued_audio_size = SDL_GetQueuedAudioSize(audio_device);
+
                 for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
                         if (!haptic_handles[i]) {
                                 continue;
@@ -332,8 +352,9 @@ int main(void)
                 u64 current_time = SDL_GetPerformanceCounter();
                 f32 frame_ms = (1000.0f * (current_time - last_time)) / (f32)perf_freq;
                 last_time = current_time;
-                if (frame_counter++ % 60 == 0) {
+                if (frame_counter++ % (60 * 5) == 0) {
                         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Frame time %.02f ms", frame_ms);
+                        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Queued audio bytes %d", queued_audio_size);
                 }
         }
 
