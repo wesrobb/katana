@@ -1,4 +1,4 @@
-#include "katana.h"
+#include "katana_platform.h"
 
 #include "SDL.h"
 

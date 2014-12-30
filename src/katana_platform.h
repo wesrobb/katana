@@ -4,6 +4,15 @@
 
 #define KATANA_TARGET_FPS 60
 
+#if KATANA_DEBUG
+#define assert(Expression)                                                                                             \
+        if (!(Expression)) {                                                                                           \
+                *(int *)0 = 0;                                                                                         \
+        }
+#else
+#define assert(Expression)
+#endif
+
 typedef unsigned char b8;
 typedef int8_t i8;
 typedef uint8_t u8;
@@ -25,14 +34,6 @@ typedef struct {
 
         b8 is_initialized;
 } game_memory_t;
-
-typedef struct {
-        i32 block_x;
-        i32 block_y;
-
-        f32 t_sine;
-        i32 tone_hz;
-} game_state_t;
 
 typedef struct {
         u32 *pixels; // Always 4 bytes per pixel. AA BB GG RR
