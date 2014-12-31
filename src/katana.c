@@ -110,52 +110,8 @@ b8 ray_cast_horizontal(vec2_t origin, i32 end_x, tilemap_t *tilemap, i32 *inters
         return 0;
 }
 
-void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_buffer, game_audio_t *audio,
-                            game_input_t *input, game_output_t *output)
+void update_player_position(game_state_t *game_state, game_input_t *input)
 {
-        if (!memory) {
-                return;
-        }
-
-        render_background(frame_buffer, 200, 10);
-
-        game_state_t *game_state = (game_state_t *)memory->transient_store;
-        if (!memory->is_initialized) {
-                game_state->player_x = 100;
-                game_state->player_y = 50;
-                game_state->player_width = 20;
-                game_state->player_height = 20;
-                game_state->player_speed = 10;
-                game_state->t_sine = 0.0f;
-                game_state->tone_hz = 512;
-                static unsigned char tilemap[18][32] = {
-                    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-                    {1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
-                    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-                };
-                game_state->tilemap.tiles = (unsigned char *)tilemap;
-                game_state->tilemap.tile_width = 40;
-                game_state->tilemap.tile_height = 40;
-                game_state->tilemap.tiles_wide = 32;
-                game_state->tilemap.tiles_high = 18;
-                memory->is_initialized = 1;
-        }
-
         u32 stick_value_count = input->controllers[0].stick_value_count;
         for (u32 i = 0; i < stick_value_count; ++i) {
                 game_state->tone_hz += 10 * input->controllers[0].stick_y[i];
@@ -168,7 +124,6 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 u32 player_speed = game_state->player_speed;
                 u8 tile_width = game_state->tilemap.tile_width;
                 u8 tile_height = game_state->tilemap.tile_height;
-                u8 tiles_wide = game_state->tilemap.tiles_wide;
 
                 if (stick_x > 0.0f) {
                         i32 new_player_x = game_state->player_x + (player_speed * stick_x);
@@ -282,19 +237,69 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                                 game_state->player_y = new_player_y;
                         }
                 }
+        }
+}
 
-                for (u32 i = 0; i < 18; ++i) {
-                        for (u32 j = 0; j < 32; ++j) {
-                                if (game_state->tilemap.tiles[j + i * tiles_wide]) {
-                                        draw_block(j * tile_width, i * tile_height, tile_width, tile_height,
-                                                   frame_buffer, 0xFFFFFF00);
-                                }
+void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_buffer, game_audio_t *audio,
+                            game_input_t *input, game_output_t *output)
+{
+        if (!memory) {
+                return;
+        }
+
+        render_background(frame_buffer, 200, 10);
+
+        game_state_t *game_state = (game_state_t *)memory->transient_store;
+        if (!memory->is_initialized) {
+                game_state->player_x = 100;
+                game_state->player_y = 50;
+                game_state->player_width = 20;
+                game_state->player_height = 20;
+                game_state->player_speed = 10;
+                game_state->t_sine = 0.0f;
+                game_state->tone_hz = 512;
+                static unsigned char tilemap[18][32] = {
+                    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+                    {1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
+                    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+                };
+                game_state->tilemap.tiles = (unsigned char *)tilemap;
+                game_state->tilemap.tile_width = 40;
+                game_state->tilemap.tile_height = 40;
+                game_state->tilemap.tiles_wide = 32;
+                game_state->tilemap.tiles_high = 18;
+                memory->is_initialized = 1;
+        }
+
+        update_player_position(game_state, input);
+
+        for (u32 i = 0; i < 18; ++i) {
+                for (u32 j = 0; j < 32; ++j) {
+                        if (game_state->tilemap.tiles[j + i * game_state->tilemap.tiles_wide]) {
+                                draw_block(j * game_state->tilemap.tile_width, i * game_state->tilemap.tile_height,
+                                           game_state->tilemap.tile_width, game_state->tilemap.tile_height,
+                                           frame_buffer, 0xFFFFFF00);
                         }
                 }
-
-                draw_block(game_state->player_x, game_state->player_y, game_state->player_width,
-                           game_state->player_height, frame_buffer, 0xFFFFFFFF);
-
-                output_sine_wave(game_state, audio);
         }
+
+        draw_block(game_state->player_x, game_state->player_y, game_state->player_width, game_state->player_height,
+                   frame_buffer, 0xFFFFFFFF);
+
+        output_sine_wave(game_state, audio);
 }
