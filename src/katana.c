@@ -95,7 +95,7 @@ b8 ray_cast_horizontal(vec2_t origin, i32 end_x, tilemap_t *tilemap, i32 *inters
         if (origin.x < end_x) {
                 for (i32 i = tilemap_start_x; i <= tilemap_end_x; ++i) {
                         if (*get_tile(tilemap, i, tilemap_y)) {
-                                *intersect = i * tile_width;
+                                *intersect = (i * tile_width);
                                 return 1;
                         }
                 }
@@ -163,8 +163,6 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 f32 stick_x = input->controllers[0].stick_x[i];
                 f32 stick_y = input->controllers[0].stick_y[i];
 
-                u32 player_x = game_state->player_x;
-                u32 player_y = game_state->player_y;
                 u32 player_width = game_state->player_width;
                 u32 player_height = game_state->player_height;
                 u32 player_speed = game_state->player_speed;
@@ -172,19 +170,17 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 u8 tile_height = game_state->tilemap.tile_height;
                 u8 tiles_wide = game_state->tilemap.tiles_wide;
 
-                i32 new_player_x = player_x + (player_speed * stick_x);
-                i32 new_player_y = player_y + (player_speed * stick_y);
-
                 if (stick_x > 0.0f) {
+                        i32 new_player_x = game_state->player_x + (player_speed * stick_x);
                         vec2_t origin = {};
-                        origin.x = player_x + player_width;
-                        origin.y = player_y;
+                        origin.x = game_state->player_x + player_width;
+                        origin.y = game_state->player_y;
 
                         i32 intersect_x1;
                         b8 x1_intersected = ray_cast_horizontal(origin, new_player_x + player_width,
                                                                 &game_state->tilemap, &intersect_x1);
                         i32 intersect_x2;
-                        origin.y = player_y + player_height;
+                        origin.y = game_state->player_y + player_height - 1;
                         b8 x2_intersected = ray_cast_horizontal(origin, new_player_x + player_width,
                                                                 &game_state->tilemap, &intersect_x2);
 
@@ -203,15 +199,16 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                         }
                 }
                 if (stick_x < 0.0f) {
+                        i32 new_player_x = game_state->player_x + (player_speed * stick_x);
                         vec2_t origin = {};
-                        origin.x = player_x;
-                        origin.y = player_y;
+                        origin.x = game_state->player_x;
+                        origin.y = game_state->player_y;
 
                         i32 intersect_x1;
                         b8 x1_intersected =
                             ray_cast_horizontal(origin, new_player_x, &game_state->tilemap, &intersect_x1);
                         i32 intersect_x2;
-                        origin.y = player_y + player_height;
+                        origin.y = game_state->player_y + player_height - 1;
                         b8 x2_intersected =
                             ray_cast_horizontal(origin, new_player_x, &game_state->tilemap, &intersect_x2);
 
@@ -230,15 +227,16 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                         }
                 }
                 if (stick_y > 0.0f) {
+                        i32 new_player_y = game_state->player_y + (player_speed * stick_y);
                         vec2_t origin = {};
-                        origin.x = player_x;
-                        origin.y = player_y + player_height;
+                        origin.x = game_state->player_x;
+                        origin.y = game_state->player_y + player_height;
 
                         i32 intersect_y1;
                         b8 y1_intersected = ray_cast_vertical(origin, new_player_y + player_height,
                                                               &game_state->tilemap, &intersect_y1);
                         i32 intersect_y2;
-                        origin.x = player_x + player_width;
+                        origin.x = game_state->player_x + player_width - 1;
                         b8 y2_intersected = ray_cast_vertical(origin, new_player_y + player_height,
                                                               &game_state->tilemap, &intersect_y2);
 
@@ -257,15 +255,16 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                         }
                 }
                 if (stick_y < 0.0f) {
+                        i32 new_player_y = game_state->player_y + (player_speed * stick_y);
                         vec2_t origin = {};
-                        origin.x = player_x;
-                        origin.y = player_y;
+                        origin.x = game_state->player_x;
+                        origin.y = game_state->player_y;
 
                         i32 intersect_y1;
                         b8 y1_intersected =
                             ray_cast_vertical(origin, new_player_y, &game_state->tilemap, &intersect_y1);
                         i32 intersect_y2;
-                        origin.x = player_x + player_width;
+                        origin.x = game_state->player_x + player_width - 1;
                         b8 y2_intersected =
                             ray_cast_vertical(origin, new_player_y, &game_state->tilemap, &intersect_y2);
 
