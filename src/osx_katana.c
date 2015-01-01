@@ -33,7 +33,7 @@ typedef struct {
         game_update_and_render_fn_t update_and_render_fn;
 } osx_game_t;
 
-#define KATANA_MAX_RECORDED_INPUT_EVENTS 65536
+#define KATANA_MAX_RECORDED_INPUT_EVENTS 6000 // 100 seconds of input at 60fps
 typedef struct {
         game_input_t *input_events;
         u32 input_record_index;
@@ -188,7 +188,6 @@ int main(void)
                                               window_width, window_height, SDL_WINDOW_RESIZABLE);
 
         SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-
         SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING,
                                                  window_width, window_height);
 
@@ -301,7 +300,7 @@ int main(void)
 
                 // TODO(Wes): Debug builds only.
                 time_t last_modified = osx_get_last_modified(game_so_paths.so);
-                if (difftime(last_modified, game.so_last_modified) != 0.0) {
+                if (difftime(last_modified, game.so_last_modified) != 0) {
                         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "katana.so modified - Reloading");
                         dlclose(game.so);
                         copyfile(game_so_paths.so, game_so_paths.temp_so, 0, COPYFILE_ALL);

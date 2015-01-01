@@ -7,11 +7,13 @@
 #if KATANA_DEBUG
 #define assert(Expression)                                                                                             \
         if (!(Expression)) {                                                                                           \
-                *(int *)0 = 0;                                                                                         \
+                *(volatile int *)0 = 0;                                                                                \
         }
 #else
 #define assert(Expression)
 #endif
+
+#define is_aligned(POINTER, BYTE_COUNT) (((uintptr_t)(const void *)(POINTER)) % (BYTE_COUNT) == 0)
 
 typedef unsigned char b8;
 typedef int8_t i8;
