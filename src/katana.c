@@ -50,10 +50,10 @@ static void draw_block(f32 x, f32 y, f32 width, f32 height, game_frame_buffer_t 
         round_input[2] = (x + width) * units_to_pixels;
         round_input[3] = (y + height) * units_to_pixels;
         k_roundf4(round_input, round_output);
-        i32 x_start = round_output[0];
-        i32 y_start = round_output[1];
-        i32 right = round_output[2];
-        i32 top = round_output[3];
+        i32 x_start = (i32)round_output[0];
+        i32 y_start = (i32)round_output[1];
+        i32 right = (i32)round_output[2];
+        i32 top = (i32)round_output[3];
         for (i32 i = x_start; i < right; ++i) {
                 for (i32 j = y_start; j < top; ++j) {
                         frame_buffer->pixels[i + j * frame_buffer->width] = color;
@@ -124,17 +124,43 @@ b8 ray_cast_horizontal(vec2f_t origin, f32 end_x, tilemap_t *tilemap, f32 *inter
 
 void update_player_position(world_t *world, game_input_t *input)
 {
+        u32 player_width = world->player_size.x;
+        u32 player_height = world->player_size.y;
+        u32 player_speed = world->player_speed;
+        u8 tile_width = world->tilemap.tile_width;
+        u8 tile_height = world->tilemap.tile_height;
+
+        // Gravity
+        f32 new_player_y = world->player_pos.y + (world->gravity * input->delta_time);
+        vec2f_t origin = {};
+        origin.x = world->player_pos.x;
+        origin.y = world->player_pos.y + player_height;
+
+        f32 intersect_y1;
+        b8 y1_intersected = ray_cast_vertical(origin, new_player_y + player_height, &world->tilemap, &intersect_y1);
+        f32 intersect_y2;
+        origin.x = world->player_pos.x + player_width - 0.1f;
+        b8 y2_intersected = ray_cast_vertical(origin, new_player_y + player_height, &world->tilemap, &intersect_y2);
+
+        if (y1_intersected && y2_intersected) {
+                if (y1_intersected <= y2_intersected) {
+                        world->player_pos.y = intersect_y1 - player_height;
+                } else {
+                        world->player_pos.y = intersect_y2 - player_height;
+                }
+        } else if (y1_intersected) {
+                world->player_pos.y = intersect_y1 - player_height;
+        } else if (y2_intersected) {
+                world->player_pos.y = intersect_y2 - player_height;
+        } else {
+                world->player_pos.y = new_player_y;
+        }
+
         u32 stick_value_count = input->controllers[0].stick_value_count;
         for (u32 i = 0; i < stick_value_count; ++i) {
 
                 f32 stick_x = input->controllers[0].stick_x[i];
                 f32 stick_y = input->controllers[0].stick_y[i];
-
-                u32 player_width = world->player_size.x;
-                u32 player_height = world->player_size.y;
-                u32 player_speed = world->player_speed;
-                u8 tile_width = world->tilemap.tile_width;
-                u8 tile_height = world->tilemap.tile_height;
 
                 if (stick_x > 0.0f) {
                         f32 new_player_x = world->player_pos.x + (player_speed * stick_x);
@@ -258,12 +284,13 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
 
         game_state_t *game_state = (game_state_t *)memory->transient_store;
         if (!memory->is_initialized) {
-                game_state->world.units_to_pixels = 5.0f / 1.0f;
+                game_state->world.units_to_pixels = 10.0f / 1.0f;
                 game_state->world.player_pos.x = 10.0f;
                 game_state->world.player_pos.y = 10.0f;
                 game_state->world.player_size.x = 2.0f;
                 game_state->world.player_size.y = 2.0f;
                 game_state->world.player_speed = 1.0f;
+                game_state->world.gravity = 9.8f;
                 game_state->t_sine = 0.0f;
                 game_state->tone_hz = 512;
                 static unsigned char tilemap[18][32] = {

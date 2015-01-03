@@ -261,6 +261,7 @@ int main(void)
         u64 last_time = 0;
         u64 perf_freq = SDL_GetPerformanceFrequency();
         i32 frame_counter = 0;
+        f32 frame_ms = 1.0f / KATANA_TARGET_FPS;
         SDL_Event event;
         b8 recording = false;
         b8 playing_back = false;
@@ -309,6 +310,7 @@ int main(void)
                 }
 
                 osx_handle_input(new_input, old_input);
+                new_input->delta_time = 1.0f / KATANA_TARGET_FPS;
 
                 if (recording) {
                         game_record.input_events[game_record.input_record_index++] = *new_input;
@@ -352,7 +354,7 @@ int main(void)
                 old_input = temp;
 
                 u64 current_time = SDL_GetPerformanceCounter();
-                f32 frame_ms = (1000.0f * (current_time - last_time)) / (f32)perf_freq;
+                frame_ms = (1000.0f * (current_time - last_time)) / (f32)perf_freq;
                 last_time = current_time;
                 if (frame_counter++ % (60 * 5) == 0) {
                         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Frame time %.02f ms", frame_ms);

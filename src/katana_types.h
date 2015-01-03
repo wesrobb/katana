@@ -28,6 +28,7 @@ typedef struct {
         vec2f_t player_pos;
         vec2f_t player_size;
         f32 player_speed;
+        f32 gravity;
 } world_t;
 
 typedef struct {

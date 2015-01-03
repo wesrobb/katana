@@ -4,7 +4,7 @@
 
 #include <immintrin.h>
 
-static inline void k_roundf4(f32 *restrict in, f32 *restrict out)
+static inline void k_roundf4(f32 *in, f32 *out)
 {
         // NOTE(Wes): store_ps and load_ps require 16 byte alignment.
         assert(is_aligned(in, 16));

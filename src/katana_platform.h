@@ -90,6 +90,8 @@ typedef struct {
         i32 mouse_z;
 
         game_controller_input_t controllers[KATANA_MAX_CONTROLLERS];
+
+        f32 delta_time;
 } game_input_t;
 
 typedef struct {
