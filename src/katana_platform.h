@@ -13,6 +13,7 @@
 #define assert(Expression)
 #endif
 
+#define set_alignment(BYTE_COUNT) __attribute__((__aligned__(BYTE_COUNT)))
 #define is_aligned(POINTER, BYTE_COUNT) (((uintptr_t)(const void *)(POINTER)) % (BYTE_COUNT) == 0)
 
 typedef unsigned char b8;
@@ -52,8 +53,10 @@ typedef struct {
 typedef struct {
         b8 is_connected;
         b8 is_analog;
-        f32 stick_x[KATANA_MAX_STICK_VALUES];
-        f32 stick_y[KATANA_MAX_STICK_VALUES];
+        f32 left_stick_x[KATANA_MAX_STICK_VALUES];
+        f32 left_stick_y[KATANA_MAX_STICK_VALUES];
+        f32 right_stick_x[KATANA_MAX_STICK_VALUES];
+        f32 right_stick_y[KATANA_MAX_STICK_VALUES];
         u32 stick_value_count;
 
         union {

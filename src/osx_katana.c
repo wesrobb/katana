@@ -145,12 +145,20 @@ static void osx_handle_input(game_input_t *new_input, game_input_t *old_input)
                                               SDL_CONTROLLER_BUTTON_B);
 
                 if (stick_values_index < KATANA_MAX_STICK_VALUES) {
-                        i16 stick_x = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_LEFTX);
-                        i16 stick_y = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_LEFTY);
+                        i16 left_stick_x = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_LEFTX);
+                        i16 left_stick_y = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_LEFTY);
+                        i16 right_stick_x = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_RIGHTX);
+                        i16 right_stick_y = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_RIGHTY);
                         // TODO(Wes): Tune dead zones
                         const i16 dead_zone = 4096;
-                        new_controller->stick_x[stick_values_index] = osx_process_controller_axis(stick_x, dead_zone);
-                        new_controller->stick_y[stick_values_index] = osx_process_controller_axis(stick_y, dead_zone);
+                        new_controller->left_stick_x[stick_values_index] =
+                            osx_process_controller_axis(left_stick_x, dead_zone);
+                        new_controller->left_stick_y[stick_values_index] =
+                            osx_process_controller_axis(left_stick_y, dead_zone);
+                        new_controller->right_stick_x[stick_values_index] =
+                            osx_process_controller_axis(right_stick_x, dead_zone);
+                        new_controller->right_stick_y[stick_values_index] =
+                            osx_process_controller_axis(right_stick_y, dead_zone);
                         stick_values_index++;
                 }
                 new_controller->stick_value_count = stick_values_index + 1;
@@ -322,8 +330,8 @@ int main(void)
                         *new_input = game_record.input_events[playback_index];
                 }
 
-                // SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-                // SDL_RenderClear(renderer);
+                SDL_SetRenderDrawColor(renderer, 255, 128, 0, 255);
+                SDL_RenderClear(renderer);
 
                 game.update_and_render_fn(&game_memory, &frame_buffer, &audio, new_input, &output);
 

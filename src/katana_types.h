@@ -5,30 +5,30 @@
 typedef struct {
         i32 x;
         i32 y;
-} vec2_t;
+} vec2i_t set_alignment(16); // 16 byte alignment required for SIMD intrinsics.
 
 typedef struct {
         f32 x;
         f32 y;
-} vec2f_t;
+} vec2f_t set_alignment(16); // 16 byte alignment required for SIMD intrisics.
 
 typedef struct {
         unsigned char *tiles;
-        f32 tile_width;
-        f32 tile_height;
+        vec2f_t tile_size;
         u16 tiles_wide;
         u16 tiles_high;
 } tilemap_t;
 
 typedef struct {
-        // Everything is measured in units, only during drawing
-        // do we convert to pixels.
-        f32 units_to_pixels;
         tilemap_t tilemap;
         vec2f_t player_pos;
         vec2f_t player_size;
+        vec2f_t draw_offset;
         f32 player_speed;
         f32 gravity;
+        // Everything is measured in units, only during drawing
+        // do we convert to pixels.
+        f32 units_to_pixels;
 } world_t;
 
 typedef struct {
