@@ -2,6 +2,7 @@ build
 projects
 tags
 cscope.out
+.DS_Store
 
 *.swp
 *.pyc

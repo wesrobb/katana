@@ -174,14 +174,37 @@ void update_player_position(world_t *world, game_input_t *input)
                 world->player_pos.y = new_player_y;
         }
 #endif
+        // Ensures we never move exactly onto the tile we are colliding with.
+        f32 collision_buffer = 0.01f;
 
-        // NOTE(Wes) We always ray cast 4 times:
+        // Gravity collision check.
+        vec2f_t half_player_size = vec2f_div(world->player_size, 2.0f);
+        f32 cast_y = half_player_size.y;
+        vec2f_t left_origin;
+        left_origin.x = world->player_pos.x - half_player_size.x + collision_buffer;
+        left_origin.y = world->player_pos.y + cast_y;
+        vec2f_t right_origin;
+        right_origin.x = world->player_pos.x + half_player_size.x - collision_buffer;
+        right_origin.y = left_origin.y;
+
+        vec2f_t new_player_pos;
+        new_player_pos.x = world->player_pos.x;
+        new_player_pos.y = world->player_pos.y + (world->gravity * input->delta_time);
+        f32 end_y = new_player_pos.y + half_player_size.y;
+        f32 intersect_y1 = ray_cast_vertical(left_origin, end_y, &world->tilemap);
+        f32 intersect_y2 = ray_cast_vertical(right_origin, end_y, &world->tilemap);
+
+        if (intersect_y1 <= intersect_y2) {
+                world->player_pos.y = intersect_y1 - half_player_size.y;
+        } else {
+                world->player_pos.y = intersect_y2 - half_player_size.y;
+        }
+        // NOTE(Wes) We always ray cast 4 times for movement:
         // If we are moving left we cast left from the left side at the top and bottom of the player, vice versa for
         // right.
         // If we are moving down we cast down from the bottom side at the left and right of the player, vice versa for
         // up.
         u32 stick_value_count = input->controllers[0].stick_value_count;
-        vec2f_t half_player_size = vec2f_div(world->player_size, 2.0f);
         for (u32 i = 0; i < stick_value_count; ++i) {
                 vec2f_t left_stick;
                 vec2f_t right_stick;
@@ -195,8 +218,7 @@ void update_player_position(world_t *world, game_input_t *input)
                 world->draw_offset = vec2f_add(right_stick, world->draw_offset);
 
                 vec2f_t player_velocity = vec2f_mul(left_stick, world->player_speed);
-                player_velocity.y = player_velocity.y + (world->gravity * input->delta_time);
-                vec2f_t new_player_pos = vec2f_add(world->player_pos, player_velocity);
+                new_player_pos = vec2f_add(world->player_pos, player_velocity);
 
                 // Get the movement direction as -1 = left/up, 0 = unused, 1 = right/down
                 vec2i_t move_dir;
@@ -217,10 +239,10 @@ void update_player_position(world_t *world, game_input_t *input)
                 f32 cast_x = half_player_size.x * move_dir.x;
                 vec2f_t top_origin;
                 top_origin.x = world->player_pos.x + cast_x;
-                top_origin.y = world->player_pos.y - half_player_size.y + 0.5f;
+                top_origin.y = world->player_pos.y - half_player_size.y + collision_buffer;
                 vec2f_t bot_origin;
                 bot_origin.x = top_origin.x;
-                bot_origin.y = world->player_pos.y + half_player_size.y - 0.5f;
+                bot_origin.y = world->player_pos.y + half_player_size.y - collision_buffer;
 
                 f32 end_x = new_player_pos.x + cast_x;
                 f32 intersect_x1 = ray_cast_horizontal(top_origin, end_x, &world->tilemap);
@@ -235,10 +257,10 @@ void update_player_position(world_t *world, game_input_t *input)
                 // Vertical collision check.
                 f32 cast_y = half_player_size.y * move_dir.y;
                 vec2f_t left_origin;
-                left_origin.x = world->player_pos.x - half_player_size.x + 0.5f;
+                left_origin.x = world->player_pos.x - half_player_size.x + collision_buffer;
                 left_origin.y = world->player_pos.y + cast_y;
                 vec2f_t right_origin;
-                right_origin.x = world->player_pos.x + half_player_size.x - 0.5f;
+                right_origin.x = world->player_pos.x + half_player_size.x - collision_buffer;
                 right_origin.y = left_origin.y;
 
                 f32 end_y = new_player_pos.y + cast_y;
