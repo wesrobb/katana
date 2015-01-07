@@ -2,15 +2,17 @@
 
 #include "katana_platform.h"
 
+#include <immintrin.h>
+
 typedef struct {
         i32 x;
         i32 y;
-} vec2i_t set_alignment(16); // 16 byte alignment required for SIMD intrinsics.
+} vec2i_t;
 
 typedef struct {
         f32 x;
         f32 y;
-} vec2f_t set_alignment(16); // 16 byte alignment required for SIMD intrisics.
+} vec2f_t;
 
 typedef struct {
         unsigned char *tiles;

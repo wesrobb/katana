@@ -47,48 +47,42 @@ static void draw_block(vec2f_t pos, vec2f_t size, vec2f_t draw_offset, game_fram
 {
         // Calculate top left and bottom right of block.
         vec2f_t half_size = vec2f_div(size, 2.0f);
-        vec2f_t top_left_corner;
-        vec2f_copy(&top_left_corner, pos);
-        top_left_corner = vec2f_sub(top_left_corner, half_size);
-
-        vec2f_t bot_right_corner;
-        vec2f_copy(&bot_right_corner, pos);
-        bot_right_corner = vec2f_add(bot_right_corner, half_size);
+        vec2f_t top_left_corner = vec2f_sub(pos, half_size);
+        vec2f_t bot_right_corner = vec2f_add(pos, half_size);
 
         // Add draw offsets.
-        vec2f_add2(top_left_corner, draw_offset, bot_right_corner, draw_offset, &top_left_corner, &bot_right_corner);
+        top_left_corner = vec2f_add(top_left_corner, draw_offset);
+        bot_right_corner = vec2f_add(bot_right_corner, draw_offset);
 
         // Convert to pixel values and round to nearest integer.
-        vec2f_mul2(top_left_corner, bot_right_corner, units_to_pixels, &top_left_corner, &bot_right_corner);
-
+        top_left_corner = vec2f_mul(top_left_corner, units_to_pixels);
+        bot_right_corner = vec2f_mul(bot_right_corner, units_to_pixels);
         vec2i_t top_left_pixel;
         vec2i_t bot_right_pixel;
         vec2f_round2(top_left_corner, bot_right_corner, &top_left_pixel, &bot_right_pixel);
 
+        // Bounds checking
         if (top_left_pixel.x < 0) {
                 top_left_pixel.x = 0;
-        }
-        if (top_left_pixel.x >= (i32)frame_buffer->width) {
+        } else if (top_left_pixel.x >= (i32)frame_buffer->width) {
                 top_left_pixel.x = frame_buffer->width - 1;
         }
         if (top_left_pixel.y < 0) {
                 top_left_pixel.y = 0;
-        }
-        if (top_left_pixel.y >= (i32)frame_buffer->height) {
+        } else if (top_left_pixel.y >= (i32)frame_buffer->height) {
                 top_left_pixel.y = frame_buffer->height - 1;
         }
         if (bot_right_pixel.x < 0) {
                 bot_right_pixel.x = 0;
-        }
-        if (bot_right_pixel.x >= (i32)frame_buffer->width) {
+        } else if (bot_right_pixel.x >= (i32)frame_buffer->width) {
                 bot_right_pixel.x = frame_buffer->width - 1;
         }
         if (bot_right_pixel.y < 0) {
                 bot_right_pixel.y = 0;
-        }
-        if (bot_right_pixel.y >= (i32)frame_buffer->height) {
+        } else if (bot_right_pixel.y >= (i32)frame_buffer->height) {
                 bot_right_pixel.y = frame_buffer->height - 1;
         }
+
         for (i32 i = top_left_pixel.y; i < bot_right_pixel.y; ++i) {
                 for (i32 j = top_left_pixel.x; j < bot_right_pixel.x; ++j) {
                         frame_buffer->pixels[j + i * frame_buffer->width] = color;
@@ -101,70 +95,58 @@ unsigned char *get_tile(tilemap_t *tilemap, u32 x, u32 y)
         return &tilemap->tiles[x + y * tilemap->tiles_wide];
 }
 
-b8 ray_cast_vertical(vec2f_t origin, f32 end_y, tilemap_t *tilemap, f32 *intersect)
+f32 ray_cast_vertical(vec2f_t origin, f32 end_y, tilemap_t *tilemap)
 {
-        assert(intersect);
-
         f32 tile_width = tilemap->tile_size.x;
         f32 tile_height = tilemap->tile_size.y;
         i32 tilemap_start_y = origin.y / tile_height;
         i32 tilemap_x = origin.x / tile_width;
         i32 tilemap_end_y = end_y / tile_height;
 
-        if (origin.y < end_y) {
-                for (i32 i = tilemap_start_y; i <= tilemap_end_y; ++i) {
-                        if (*get_tile(tilemap, tilemap_x, i)) {
-                                *intersect = i * tile_height;
-                                return 1;
-                        }
-                }
-        } else {
-                for (i32 i = tilemap_start_y; i >= tilemap_end_y; --i) {
-                        if (*get_tile(tilemap, tilemap_x, i)) {
-                                *intersect = i * tile_height;
-                                return 1;
-                        }
+        for (i32 i = tilemap_start_y; i <= tilemap_end_y; ++i) {
+                if (*get_tile(tilemap, tilemap_x, i)) {
+                        f32 intersect = i * tile_height;
+                        return intersect;
                 }
         }
-        return 0;
+        for (i32 i = tilemap_start_y - 1; i >= tilemap_end_y; --i) {
+                if (*get_tile(tilemap, tilemap_x, i)) {
+                        f32 intersect = (i + 1) * tile_height;
+                        return intersect;
+                }
+        }
+        // No intersect found if we get here so just set it to as far as requested.
+        return end_y;
 }
 
-b8 ray_cast_horizontal(vec2f_t origin, f32 end_x, tilemap_t *tilemap, f32 *intersect)
+f32 ray_cast_horizontal(vec2f_t origin, f32 end_x, tilemap_t *tilemap)
 {
-        assert(intersect);
-
         f32 tile_width = tilemap->tile_size.x;
         f32 tile_height = tilemap->tile_size.y;
         i32 tilemap_start_x = origin.x / tile_width;
         i32 tilemap_y = origin.y / tile_height;
         i32 tilemap_end_x = end_x / tile_width;
 
-        if (origin.x < end_x) {
-                for (i32 i = tilemap_start_x; i <= tilemap_end_x; ++i) {
-                        if (*get_tile(tilemap, i, tilemap_y)) {
-                                *intersect = (i * tile_width);
-                                return 1;
-                        }
-                }
-        } else {
-                for (i32 i = tilemap_start_x; i >= tilemap_end_x; --i) {
-                        if (*get_tile(tilemap, i, tilemap_y)) {
-                                *intersect = i * tile_width;
-                                return 1;
-                        }
+        for (i32 i = tilemap_start_x; i <= tilemap_end_x; ++i) {
+                unsigned char *tile = get_tile(tilemap, i, tilemap_y);
+                if (*tile) {
+                        f32 intersect = i * tile_width;
+                        return intersect;
                 }
         }
-        return 0;
+        for (i32 i = tilemap_start_x - 1; i >= tilemap_end_x; --i) {
+                unsigned char *tile = get_tile(tilemap, i, tilemap_y);
+                if (*tile) {
+                        f32 intersect = (i + 1) * tile_width;
+                        return intersect;
+                }
+        }
+        // No intersect found if we get here so just set it to as far as requested.
+        return end_x;
 }
 
 void update_player_position(world_t *world, game_input_t *input)
 {
-        u32 player_width = world->player_size.x;
-        u32 player_height = world->player_size.y;
-        u32 player_speed = world->player_speed;
-        u8 tile_width = world->tilemap.tile_size.x;
-        u8 tile_height = world->tilemap.tile_size.y;
-
 #if 0
         // Gravity
         f32 new_player_y = world->player_pos.y + (world->gravity * input->delta_time);
@@ -198,48 +180,79 @@ void update_player_position(world_t *world, game_input_t *input)
         // right.
         // If we are moving down we cast down from the bottom side at the left and right of the player, vice versa for
         // up.
-        vec2f_t cast_origins[4];
         u32 stick_value_count = input->controllers[0].stick_value_count;
+        vec2f_t half_player_size = vec2f_div(world->player_size, 2.0f);
         for (u32 i = 0; i < stick_value_count; ++i) {
+                vec2f_t left_stick;
+                vec2f_t right_stick;
+                left_stick.x = input->controllers[0].left_stick_x[i];
+                left_stick.y = input->controllers[0].left_stick_y[i];
+                right_stick.x = input->controllers[0].right_stick_x[i];
+                right_stick.y = input->controllers[0].right_stick_y[i];
 
-                f32 stick_x = input->controllers[0].left_stick_x[i];
-                f32 stick_y = input->controllers[0].left_stick_y[i];
-                f32 right_stick_x = input->controllers[0].right_stick_x[i];
-                f32 right_stick_y = input->controllers[0].right_stick_y[i];
+                // TODO(Wes): Create an offset speed instead of using player speed.
+                right_stick = vec2f_mul(right_stick, world->player_speed);
+                world->draw_offset = vec2f_add(right_stick, world->draw_offset);
 
-                world->draw_offset.x += (player_speed * right_stick_x);
-                world->draw_offset.y += (player_speed * right_stick_y);
+                vec2f_t player_velocity = vec2f_mul(left_stick, world->player_speed);
+                player_velocity.y = player_velocity.y + (world->gravity * input->delta_time);
+                vec2f_t new_player_pos = vec2f_add(world->player_pos, player_velocity);
 
-                if (stick_x > 0.0f) {
-                        f32 new_player_x = world->player_pos.x + (player_speed * stick_x);
-                        vec2f_t origin = {};
-                        origin.x = world->player_pos.x + player_width;
-                        origin.y = world->player_pos.y;
-
-                        f32 intersect_x1;
-                        b8 x1_intersected =
-                            ray_cast_horizontal(origin, new_player_x + player_width, &world->tilemap, &intersect_x1);
-                        f32 intersect_x2;
-                        origin.y = world->player_pos.y + player_height - 0.1f;
-                        b8 x2_intersected =
-                            ray_cast_horizontal(origin, new_player_x + player_width, &world->tilemap, &intersect_x2);
-
-                        if (x1_intersected && x2_intersected) {
-                                if (x1_intersected <= x2_intersected) {
-                                        world->player_pos.x = intersect_x1 - player_width;
-                                } else {
-                                        world->player_pos.x = intersect_x2 - player_width;
-                                }
-                        } else if (x1_intersected) {
-                                world->player_pos.x = intersect_x1 - player_width;
-                        } else if (x2_intersected) {
-                                world->player_pos.x = intersect_x2 - player_width;
-                        } else {
-                                world->player_pos.x = new_player_x;
-                        }
+                // Get the movement direction as -1 = left/up, 0 = unused, 1 = right/down
+                vec2i_t move_dir;
+                move_dir.x = 0.0f;
+                move_dir.y = 0.0f;
+                if (player_velocity.x > 0.0f) {
+                        move_dir.x = 1;
+                } else if (player_velocity.x < 0.0f) {
+                        move_dir.x = -1;
                 }
+                if (player_velocity.y > 0.0f) {
+                        move_dir.y = 1;
+                } else if (player_velocity.y < 0.0f) {
+                        move_dir.y = -1;
+                }
+
+                // Horizontal collision check.
+                f32 cast_x = half_player_size.x * move_dir.x;
+                vec2f_t top_origin;
+                top_origin.x = world->player_pos.x + cast_x;
+                top_origin.y = world->player_pos.y - half_player_size.y + 0.5f;
+                vec2f_t bot_origin;
+                bot_origin.x = top_origin.x;
+                bot_origin.y = world->player_pos.y + half_player_size.y - 0.5f;
+
+                f32 end_x = new_player_pos.x + cast_x;
+                f32 intersect_x1 = ray_cast_horizontal(top_origin, end_x, &world->tilemap);
+                f32 intersect_x2 = ray_cast_horizontal(bot_origin, end_x, &world->tilemap);
+
+                if ((move_dir.x * intersect_x1) <= (move_dir.x * intersect_x2)) {
+                        world->player_pos.x = intersect_x1 - cast_x;
+                } else {
+                        world->player_pos.x = intersect_x2 - cast_x;
+                }
+
+                // Vertical collision check.
+                f32 cast_y = half_player_size.y * move_dir.y;
+                vec2f_t left_origin;
+                left_origin.x = world->player_pos.x - half_player_size.x + 0.5f;
+                left_origin.y = world->player_pos.y + cast_y;
+                vec2f_t right_origin;
+                right_origin.x = world->player_pos.x + half_player_size.x - 0.5f;
+                right_origin.y = left_origin.y;
+
+                f32 end_y = new_player_pos.y + cast_y;
+                f32 intersect_y1 = ray_cast_vertical(left_origin, end_y, &world->tilemap);
+                f32 intersect_y2 = ray_cast_vertical(right_origin, end_y, &world->tilemap);
+
+                if ((move_dir.y * intersect_y1) <= (move_dir.y * intersect_y2)) {
+                        world->player_pos.y = intersect_y1 - cast_y;
+                } else {
+                        world->player_pos.y = intersect_y2 - cast_y;
+                }
+                /*
                 if (stick_x < 0.0f) {
-                        f32 new_player_x = world->player_pos.x + (player_speed * stick_x);
+                        f32 new_player_x = world->player_pos.x + (world->player_speed * stick_x);
                         vec2f_t origin = {};
                         origin.x = world->player_pos.x;
                         origin.y = world->player_pos.y;
@@ -265,7 +278,7 @@ void update_player_position(world_t *world, game_input_t *input)
                         }
                 }
                 if (stick_y > 0.0f) {
-                        f32 new_player_y = world->player_pos.y + (player_speed * stick_y);
+                        f32 new_player_y = world->player_pos.y + (world->player_speed * stick_y);
                         vec2f_t origin = {};
                         origin.x = world->player_pos.x;
                         origin.y = world->player_pos.y + player_height;
@@ -293,7 +306,7 @@ void update_player_position(world_t *world, game_input_t *input)
                         }
                 }
                 if (stick_y < 0.0f) {
-                        f32 new_player_y = world->player_pos.y + (player_speed * stick_y);
+                        f32 new_player_y = world->player_pos.y + (world->player_speed * stick_y);
                         vec2f_t origin = {};
                         origin.x = world->player_pos.x;
                         origin.y = world->player_pos.y;
@@ -317,7 +330,7 @@ void update_player_position(world_t *world, game_input_t *input)
                         } else {
                                 world->player_pos.y = new_player_y;
                         }
-                }
+                }*/
         }
 }
 
@@ -385,8 +398,10 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 for (u32 j = 0; j < 32; ++j) {
                         if (tilemap->tiles[j + i * tilemap->tiles_wide]) {
                                 vec2f_t tile_origin;
-                                tile_origin.x = j * tilemap->tile_size.x;
+                                tile_origin.x = (j * tilemap->tile_size.x);
                                 tile_origin.y = i * tilemap->tile_size.y;
+                                vec2f_t tile_half_size = vec2f_div(tilemap->tile_size, 2.0f);
+                                tile_origin = vec2f_add(tile_origin, tile_half_size);
                                 draw_block(tile_origin, tilemap->tile_size, game_state->world.draw_offset, frame_buffer,
                                            0xFFFFFF00, units_to_pixels);
                         }
