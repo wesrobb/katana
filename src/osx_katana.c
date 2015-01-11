@@ -109,7 +109,6 @@ static f32 osx_process_controller_axis(i16 stick_value, i16 dead_zone_threshold)
 
 static void osx_handle_input(game_input_t *new_input, game_input_t *old_input)
 {
-        u32 stick_values_index = 0;
         for (int i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
                 if (!SDL_GameControllerGetAttached(controller_handles[i])) {
                         continue;
@@ -144,24 +143,16 @@ static void osx_handle_input(game_input_t *new_input, game_input_t *old_input)
                 osx_process_controller_button(&(old_controller->action_right), &(new_controller->action_right), handle,
                                               SDL_CONTROLLER_BUTTON_B);
 
-                if (stick_values_index < KATANA_MAX_STICK_VALUES) {
-                        i16 left_stick_x = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_LEFTX);
-                        i16 left_stick_y = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_LEFTY);
-                        i16 right_stick_x = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_RIGHTX);
-                        i16 right_stick_y = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_RIGHTY);
-                        // TODO(Wes): Tune dead zones
-                        const i16 dead_zone = 4096;
-                        new_controller->left_stick_x[stick_values_index] =
-                            osx_process_controller_axis(left_stick_x, dead_zone);
-                        new_controller->left_stick_y[stick_values_index] =
-                            osx_process_controller_axis(left_stick_y, dead_zone);
-                        new_controller->right_stick_x[stick_values_index] =
-                            osx_process_controller_axis(right_stick_x, dead_zone);
-                        new_controller->right_stick_y[stick_values_index] =
-                            osx_process_controller_axis(right_stick_y, dead_zone);
-                        stick_values_index++;
-                }
-                new_controller->stick_value_count = stick_values_index + 1;
+                i16 left_stick_x = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_LEFTX);
+                i16 left_stick_y = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_LEFTY);
+                i16 right_stick_x = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_RIGHTX);
+                i16 right_stick_y = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_RIGHTY);
+                // TODO(Wes): Tune dead zones
+                const i16 dead_zone = 4096;
+                new_controller->left_stick_x = osx_process_controller_axis(left_stick_x, dead_zone);
+                new_controller->left_stick_y = osx_process_controller_axis(left_stick_y, dead_zone);
+                new_controller->right_stick_x = osx_process_controller_axis(right_stick_x, dead_zone);
+                new_controller->right_stick_y = osx_process_controller_axis(right_stick_y, dead_zone);
         }
 }
 

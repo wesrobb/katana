@@ -61,3 +61,25 @@ void vec2f_round2(vec2f_t a, vec2f_t b, vec2i_t *a_result, vec2i_t *b_result)
         b_result->x = (i32)results[2];
         b_result->y = (i32)results[3];
 }
+
+// Converts the specified vector into 1 on each axis preserving the sign.
+vec2i_t vec2f_sign(vec2f_t src)
+{
+        vec2i_t result = {};
+        if (src.x > 0.0f) {
+                result.x = 1;
+        } else if (src.x < 0.0f) {
+                result.x = -1;
+        }
+        if (src.y > 0.0f) {
+                result.y = 1;
+        } else if (src.y < 0.0f) {
+                result.y = -1;
+        }
+        return result;
+}
+
+vec2f_t vec2f_lerp(vec2f_t v0, vec2f_t v1, f32 t)
+{
+        return vec2f_add(vec2f_mul(v1, t), vec2f_mul(v0, 1.0f - t));
+}

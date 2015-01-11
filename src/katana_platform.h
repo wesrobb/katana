@@ -53,11 +53,10 @@ typedef struct {
 typedef struct {
         b8 is_connected;
         b8 is_analog;
-        f32 left_stick_x[KATANA_MAX_STICK_VALUES];
-        f32 left_stick_y[KATANA_MAX_STICK_VALUES];
-        f32 right_stick_x[KATANA_MAX_STICK_VALUES];
-        f32 right_stick_y[KATANA_MAX_STICK_VALUES];
-        u32 stick_value_count;
+        f32 left_stick_x;
+        f32 left_stick_y;
+        f32 right_stick_x;
+        f32 right_stick_y;
 
         union {
                 game_button_state_t Buttons[12];
