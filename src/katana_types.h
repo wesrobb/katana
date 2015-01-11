@@ -15,6 +15,12 @@ typedef struct {
 } vec2f_t;
 
 typedef struct {
+        u8 *data; // Order is always RGBA
+        i32 width;
+        i32 height;
+} image_t;
+
+typedef struct {
         unsigned char tiles[18 * 32];
         vec2f_t tile_size;
         u16 tiles_wide;
@@ -44,6 +50,7 @@ typedef struct {
 
 typedef struct {
         world_t world;
+        image_t background_image;
 
         f32 t_sine;
         i32 tone_hz;

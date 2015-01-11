@@ -3,13 +3,17 @@
 #include "SDL.h"
 
 #include <copyfile.h>
-#include <time.h>
 #include <dlfcn.h>
+#include <fcntl.h>
 #include <mach-o/dyld.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <time.h>
+#include <unistd.h>
 
 #define Kilobytes(Value) ((Value)*1024LL)
 #define Megabytes(Value) (Kilobytes(Value) * 1024LL)
@@ -20,7 +24,7 @@ SDL_GameController *controller_handles[KATANA_MAX_CONTROLLERS];
 SDL_Haptic *haptic_handles[KATANA_MAX_CONTROLLERS];
 
 typedef void (*game_update_and_render_fn_t)(game_memory_t *, game_frame_buffer_t *, game_audio_t *, game_input_t *,
-                                            game_output_t *);
+                                            game_output_t *, game_callbacks_t *);
 
 typedef struct {
         char *so;
@@ -175,6 +179,37 @@ static void osx_copy_game_memory(game_memory_t *dst, game_memory_t *src)
         memcpy(dst->permanent_store, src->permanent_store, src->permanent_store_size);
 }
 
+static mapped_file_t osx_map_file(const char *path)
+{
+        mapped_file_t result = {};
+        int fd = open(path, O_RDONLY);
+        if (fd == -1) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to open file %s", path);
+                return result;
+        }
+
+        // Get file size
+        struct stat st;
+        stat(path, &st);
+
+        result.size = st.st_size;
+        result.contents = mmap(0, result.size, PROT_READ, MAP_FILE | MAP_PRIVATE, fd, 0);
+        if (result.contents == MAP_FAILED) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to read file %s", path);
+                result.size = 0;
+                result.contents = 0;
+        }
+
+        close(fd);
+        return result;
+}
+
+static void osx_unmap_file(mapped_file_t *mapped_file)
+{
+        assert(mapped_file);
+        munmap(mapped_file->contents, mapped_file->size);
+}
+
 int main(void)
 {
         if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
@@ -257,6 +292,10 @@ int main(void)
                                         PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
         game_record.memory = osx_allocate_game_memory((void *)Terabytes(4));
 
+        game_callbacks_t callbacks = {};
+        callbacks.map_file = &osx_map_file;
+        callbacks.unmap_file = &osx_unmap_file;
+
         u64 last_time = 0;
         u64 perf_freq = SDL_GetPerformanceFrequency();
         i32 frame_counter = 0;
@@ -321,10 +360,16 @@ int main(void)
                         *new_input = game_record.input_events[playback_index];
                 }
 
-                SDL_SetRenderDrawColor(renderer, 255, 128, 0, 255);
-                SDL_RenderClear(renderer);
+                // NOTE(Wes): Clear the framebuffer.
+                u32 *pixel = frame_buffer.pixels;
+                for (u32 y = 0; y < frame_buffer.height; ++y) {
+                        for (u32 x = 0; x < frame_buffer.width; ++x) {
+                                *pixel = 0x00FF0000;
+                                pixel++;
+                        }
+                }
 
-                game.update_and_render_fn(&game_memory, &frame_buffer, &audio, new_input, &output);
+                game.update_and_render_fn(&game_memory, &frame_buffer, &audio, new_input, &output, &callbacks);
 
                 SDL_QueueAudio(audio_device, (void *)audio.samples, audio.sample_count * sizeof(i16));
                 u32 queued_audio_size = SDL_GetQueuedAudioSize(audio_device);

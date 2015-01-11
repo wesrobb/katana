@@ -77,8 +77,6 @@ typedef struct {
                         game_button_state_t back;
                         game_button_state_t start;
 
-                        // NOTE(casey): All buttons must be added above this line
-
                         game_button_state_t terminator;
                 };
         };
@@ -112,5 +110,20 @@ typedef struct {
         game_controller_output_t controllers[KATANA_MAX_CONTROLLERS];
 } game_output_t;
 
+typedef struct {
+        void *contents;
+        u32 size;
+        b8 success;
+} mapped_file_t;
+
+typedef mapped_file_t (*map_file_fn)(const char *filename);
+typedef void (*unmap_file_fn)(mapped_file_t *);
+
+// TODO(Wes): Pass these once during game_init or something.
+typedef struct {
+        map_file_fn map_file;
+        unmap_file_fn unmap_file;
+} game_callbacks_t;
+
 void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_buffer, game_audio_t *audio,
-                            game_input_t *input, game_output_t *output);
+                            game_input_t *input, game_output_t *output, game_callbacks_t *callbacks);

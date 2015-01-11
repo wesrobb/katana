@@ -1,7 +1,11 @@
 #include "katana_types.h"
 #include "katana_intrinsics.h"
-
 #include "katana_vec.c"
+
+#define STB_ASSERT(x) assert(x);
+#define STBI_ONLY_PNG
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 static void output_sine_wave(game_state_t *game_state, game_audio_t *audio)
 {
@@ -26,19 +30,25 @@ static void output_sine_wave(game_state_t *game_state, game_audio_t *audio)
         }
 }
 
-static void render_background(game_frame_buffer_t *frame_buffer, i32 blue_offset, i32 green_offset)
+static void draw_image(game_frame_buffer_t *frame_buffer, image_t *image)
 {
-        u8 *row = (u8 *)frame_buffer->pixels;
-        for (u32 y = 0; y < frame_buffer->height; ++y) {
-                u32 *pixel = (u32 *)row;
-                for (u32 x = 0; x < frame_buffer->width; ++x) {
-                        u8 blue = (u8)(x + blue_offset);
-                        u8 green = (u8)(y + green_offset);
+        u32 max_x = image->width;
+        u32 max_y = image->height;
+        if (max_x > frame_buffer->width) {
+                max_x = frame_buffer->width;
+        }
+        if (max_y > frame_buffer->height) {
+                max_y = frame_buffer->height;
+        }
 
-                        *pixel++ = ((green << 8) | blue);
+        u32 *pixel = frame_buffer->pixels;
+        u32 *image_data = (u32 *)image->data;
+        for (u32 y = 0; y < max_y; ++y) {
+                for (u32 x = 0; x < max_x; ++x) {
+                        u32 image_pixel = *image_data++;
+                        *pixel++ = image_pixel;
                 }
-
-                row += (frame_buffer->width * 4);
+                pixel = &frame_buffer->pixels[y * frame_buffer->width];
         }
 }
 
@@ -90,7 +100,7 @@ static void draw_block(vec2f_t pos, vec2f_t size, vec2f_t draw_offset, game_fram
         }
 }
 
-unsigned char *get_tile(tilemap_t *tilemap, u32 x, u32 y)
+static unsigned char *get_tile(tilemap_t *tilemap, u32 x, u32 y)
 {
         return &tilemap->tiles[x + y * tilemap->tiles_wide];
 }
@@ -100,7 +110,7 @@ typedef struct {
         b8 did_intersect;
 } ray_cast_result;
 
-ray_cast_result ray_cast_vertical(vec2f_t origin, f32 end_y, tilemap_t *tilemap)
+static ray_cast_result ray_cast_vertical(vec2f_t origin, f32 end_y, tilemap_t *tilemap)
 {
         ray_cast_result result;
         f32 tile_width = tilemap->tile_size.x;
@@ -129,7 +139,7 @@ ray_cast_result ray_cast_vertical(vec2f_t origin, f32 end_y, tilemap_t *tilemap)
         return result;
 }
 
-ray_cast_result ray_cast_horizontal(vec2f_t origin, f32 end_x, tilemap_t *tilemap)
+static ray_cast_result ray_cast_horizontal(vec2f_t origin, f32 end_x, tilemap_t *tilemap)
 {
         ray_cast_result result;
         f32 tile_width = tilemap->tile_size.x;
@@ -160,7 +170,7 @@ ray_cast_result ray_cast_horizontal(vec2f_t origin, f32 end_x, tilemap_t *tilema
         return result;
 }
 
-void update_player_position(world_t *world, game_input_t *input)
+static void update_player_position(world_t *world, game_input_t *input)
 {
         player_t *player = &world->player;
         // Ensures we never move exactly onto the tile we are colliding with.
@@ -255,14 +265,24 @@ void update_player_position(world_t *world, game_input_t *input)
         }
 }
 
+static image_t load_image(const char *path, map_file_fn map_file)
+{
+        // TODO(Wes): Add error checking and handle allocation on behalf of stb.
+        image_t result = {};
+        mapped_file_t mapped_file = map_file(path);
+        int components = 0;
+        int required_components = 4; // We always want RGBA.
+        result.data = stbi_load_from_memory(mapped_file.contents, mapped_file.size, &result.width, &result.height,
+                                            &components, required_components);
+        return result;
+}
+
 void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_buffer, game_audio_t *audio,
-                            game_input_t *input, game_output_t *output)
+                            game_input_t *input, game_output_t *output, game_callbacks_t *callbacks)
 {
         if (!memory) {
                 return;
         }
-
-        render_background(frame_buffer, 200, 10);
 
         game_state_t *game_state = (game_state_t *)memory->transient_store;
         if (!memory->is_initialized) {
@@ -311,6 +331,9 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 game_state->world.tilemap.tile_size.y = 4.0f;
                 game_state->world.tilemap.tiles_wide = 32;
                 game_state->world.tilemap.tiles_high = 18;
+
+                game_state->background_image = load_image("data/Background/Bg 1.png", callbacks->map_file);
+
                 memory->is_initialized = 1;
         }
 
@@ -325,6 +348,8 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
         } else {
                 game_state->world.player.max_speed = 32.0f;
         }
+
+        draw_image(frame_buffer, &game_state->background_image);
 
         update_player_position(&game_state->world, input);
 
