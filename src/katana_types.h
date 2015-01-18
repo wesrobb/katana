@@ -30,11 +30,9 @@ typedef struct {
 typedef struct {
         vec2f_t position;
         vec2f_t size;
-        vec2f_t current_velocity;
-        f32 max_speed;
-        f32 acceleration;
+        vec2f_t velocity;
+        f32 max_acceleration;
         f32 jump_speed;
-        i8 jump_count;
         b8 on_ground;
 } player_t;
 
@@ -42,7 +40,7 @@ typedef struct {
         player_t player;
         tilemap_t tilemap;
         vec2f_t draw_offset;
-        f32 gravity;
+        vec2f_t gravity; // units/sec^2
         // Everything is measured in units, only during drawing
         // do we convert to pixels.
         f32 units_to_pixels;

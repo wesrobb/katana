@@ -45,8 +45,7 @@ static void draw_image(game_frame_buffer_t *frame_buffer, image_t *image)
         u32 *image_data = (u32 *)image->data;
         for (u32 y = 0; y < max_y; ++y) {
                 for (u32 x = 0; x < max_x; ++x) {
-                        u32 image_pixel = *image_data++;
-                        *pixel++ = image_pixel;
+                        *pixel++ = *image_data++;
                 }
                 pixel = &frame_buffer->pixels[y * frame_buffer->width];
         }
@@ -175,17 +174,16 @@ static void update_player_position(world_t *world, game_input_t *input)
         player_t *player = &world->player;
         // Ensures we never move exactly onto the tile we are colliding with.
         f32 collision_buffer = 0.001f;
-        vec2f_t target_velocity = {};
+        vec2f_t acceleration = {};
 
         vec2f_t half_player_size = vec2f_div(player->size, 2.0f);
 
         // Gravity
-        vec2f_t new_player_pos;
-        target_velocity.y = world->gravity * input->delta_time;
+        acceleration = vec2f_add(acceleration, world->gravity);
 
         // Jump
         if (input->controllers[0].action_down.ended_down && player->on_ground) {
-                target_velocity.y = -player->jump_speed * input->delta_time;
+                acceleration.y = -140.0f;
         }
 
         // NOTE(Wes): We always ray cast 4 times for movement:
@@ -201,15 +199,23 @@ static void update_player_position(world_t *world, game_input_t *input)
         right_stick.y = input->controllers[0].right_stick_y;
 
         // TODO(Wes): Create an offset speed instead of using player speed.
-        right_stick = vec2f_mul(right_stick, player->max_speed);
+        right_stick = vec2f_mul(right_stick, player->max_acceleration);
         world->draw_offset = vec2f_add(right_stick, world->draw_offset);
 
-        target_velocity = vec2f_add(target_velocity, vec2f_mul(left_stick, player->max_speed * input->delta_time));
-        player->current_velocity = vec2f_lerp(player->current_velocity, target_velocity, player->acceleration);
-        new_player_pos = vec2f_add(player->position, player->current_velocity);
+        // Friction force. USE ODE here!
+        vec2f_t friction = { -7.0f * player->velocity.x, 0.0f };
+        acceleration = vec2f_add(acceleration, friction); 
+
+        f32 acceleration_factor = 5.0f;
+        acceleration = vec2f_add(vec2f_mul(left_stick, acceleration_factor), acceleration);
+        vec2f_t new_velocity = vec2f_add(vec2f_mul(acceleration, input->delta_time), player->velocity);
+        vec2f_t new_player_pos = vec2f_mul(vec2f_mul(acceleration, 0.5), input->delta_time * input->delta_time);
+        new_player_pos = vec2f_add(player->velocity, new_player_pos);
+        new_player_pos = vec2f_add(player->position, new_player_pos);
+        player->velocity = new_velocity;
 
         // Get the movement direction as -1 = left/up, 0 = unused, 1 = right/down
-        vec2i_t move_dir = vec2f_sign(player->current_velocity);
+        vec2i_t move_dir = vec2f_sign(player->velocity);
 
         // Horizontal collision check.
         f32 cast_x = half_player_size.x * move_dir.x;
@@ -231,7 +237,7 @@ static void update_player_position(world_t *world, game_input_t *input)
         }
 
         if (intersect_x1.did_intersect || intersect_x2.did_intersect) {
-                player->current_velocity.x = 0.0f;
+                player->velocity.x = 0.0f;
         }
 
         // Vertical collision check.
@@ -254,7 +260,7 @@ static void update_player_position(world_t *world, game_input_t *input)
         }
 
         if (intersect_y1.did_intersect || intersect_y2.did_intersect) {
-                player->current_velocity.y = 0.0f;
+                player->velocity.y = 0.0f;
                 if (move_dir.y == 1) {
                         player->on_ground = 1;
                 } else {
@@ -289,15 +295,15 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 game_state->world.units_to_pixels = 10.0f / 1.0f;
                 game_state->world.draw_offset.x = 0.0f;
                 game_state->world.draw_offset.y = 0.0f;
-                game_state->world.gravity = 40.0f;
+                game_state->world.gravity.x = 0.0f;
+                game_state->world.gravity.y = 9.8f;
                 game_state->t_sine = 0.0f;
                 game_state->tone_hz = 512;
                 game_state->world.player.position.x = 10.0f;
                 game_state->world.player.position.y = 10.0f;
                 game_state->world.player.size.x = 2.0f;
                 game_state->world.player.size.y = 2.0f;
-                game_state->world.player.max_speed = 32.0f;
-                game_state->world.player.acceleration = 0.1f;
+                game_state->world.player.max_acceleration = 0.5f;
                 game_state->world.player.on_ground = 0;
                 game_state->world.player.jump_speed = 1000.0f;
                 static unsigned char tilemap[18][32] = {
@@ -344,9 +350,9 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
         }
 
         if (input->controllers[0].action_up.ended_down) {
-                game_state->world.player.max_speed = 64.0f;
+                game_state->world.player.max_acceleration = 1.0f;
         } else {
-                game_state->world.player.max_speed = 32.0f;
+                game_state->world.player.max_acceleration = 0.5f;
         }
 
         draw_image(frame_buffer, &game_state->background_image);

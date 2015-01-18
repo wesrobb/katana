@@ -1,8 +1,6 @@
 #include "katana_types.h"
 #include "katana_intrinsics.h"
 
-#include <immintrin.h>
-
 vec2f_t vec2f_copy(vec2f_t src)
 {
         vec2f_t dst = {src.x, src.y};
@@ -39,6 +37,11 @@ vec2f_t vec2f_div(vec2f_t a, f32 scalar)
         quotient.x = a.x / scalar;
         quotient.y = a.y / scalar;
         return quotient;
+}
+
+f32 vec2f_dot(vec2f_t a, vec2f_t b)
+{
+        return a.x * b.x + a.y + b.y;
 }
 
 void vec2f_round2(vec2f_t a, vec2f_t b, vec2i_t *a_result, vec2i_t *b_result)

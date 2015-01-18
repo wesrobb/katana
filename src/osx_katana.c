@@ -245,8 +245,6 @@ int main(void)
         game_frame_buffer_t frame_buffer = {};
         frame_buffer.width = window_width;
         frame_buffer.height = window_height;
-        frame_buffer.pixels =
-            mmap(0, window_width * window_height * 4, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
 
         i32 max_joysticks = SDL_NumJoysticks();
         i32 controller_index = 0;
@@ -360,6 +358,10 @@ int main(void)
                         *new_input = game_record.input_events[playback_index];
                 }
 
+                // NOTE(Wes): The frame buffer pixels point directly to the SDL texture.
+                i32 texture_pitch = 0;
+                SDL_LockTexture(texture, 0, (void **)&frame_buffer.pixels, &texture_pitch);
+
                 // NOTE(Wes): Clear the framebuffer.
                 u32 *pixel = frame_buffer.pixels;
                 for (u32 y = 0; y < frame_buffer.height; ++y) {
@@ -370,6 +372,10 @@ int main(void)
                 }
 
                 game.update_and_render_fn(&game_memory, &frame_buffer, &audio, new_input, &output, &callbacks);
+                SDL_UnlockTexture(texture);
+
+                SDL_RenderCopy(renderer, texture, 0, 0);
+                SDL_RenderPresent(renderer);
 
                 SDL_QueueAudio(audio_device, (void *)audio.samples, audio.sample_count * sizeof(i16));
                 u32 queued_audio_size = SDL_GetQueuedAudioSize(audio_device);
@@ -385,13 +391,6 @@ int main(void)
                                 SDL_HapticRumbleStop(haptic_handles[i]);
                         }
                 }
-
-                if (SDL_UpdateTexture(texture, 0, (void *)frame_buffer.pixels, frame_buffer.width * 4)) {
-                        // TODO: Do something about this error!
-                }
-
-                SDL_RenderCopy(renderer, texture, 0, 0);
-                SDL_RenderPresent(renderer);
 
                 game_input_t *temp = new_input;
                 new_input = old_input;
