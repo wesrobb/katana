@@ -13,6 +13,15 @@ static inline void round4f(f32 const *in, f32 *out)
         _mm_store_ps(out, packed_result);
 }
 
+static inline void floor4f(f32 const *in, f32 *out)
+{
+        assert(is_aligned(in, 16));
+        assert(is_aligned(out, 16));
+        __m128 packed_args = _mm_load_ps(in);
+        __m128 packed_result = _mm_floor_ps(packed_args);
+        _mm_store_ps(out, packed_result);
+}
+
 static inline void ceil4f(f32 const *in, f32 *out)
 {
         assert(is_aligned(in, 16));

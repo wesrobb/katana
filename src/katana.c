@@ -30,24 +30,107 @@ static void output_sine_wave(game_state_t *game_state, game_audio_t *audio)
         }
 }
 
-static void draw_image(game_frame_buffer_t *frame_buffer, image_t *image)
+static void draw_image(vec2f_t pos, vec2f_t draw_offset, image_t *image, game_frame_buffer_t *frame_buffer,
+                       f32 units_to_pixels, b8 flip_x)
 {
-        u32 max_x = image->width;
-        u32 max_y = image->height;
-        if (max_x > frame_buffer->width) {
-                max_x = frame_buffer->width;
+        // Calculate top left and bottom right of block.
+        vec2f_t half_size;
+        half_size.x = (image->width / units_to_pixels) / 2.0f;
+        half_size.y = (image->height / units_to_pixels) / 2.0f;
+        vec2f_t top_left_corner = vec2f_sub(pos, half_size);
+        vec2f_t bot_right_corner = vec2f_add(pos, half_size);
+
+        // Add draw offsets.
+        top_left_corner = vec2f_add(top_left_corner, draw_offset);
+        bot_right_corner = vec2f_add(bot_right_corner, draw_offset);
+
+        // Convert to pixel values and round to nearest integer.
+        top_left_corner = vec2f_mul(top_left_corner, units_to_pixels);
+        bot_right_corner = vec2f_mul(bot_right_corner, units_to_pixels);
+        vec2i_t top_left_pixel;
+        vec2i_t bot_right_pixel;
+        vec2f_floor2(top_left_corner, bot_right_corner, &top_left_pixel, &bot_right_pixel);
+
+        // Bounds checking
+        i32 image_data_offset_x = 0;
+        i32 image_data_offset_y = 0;
+        if (top_left_pixel.x < 0) {
+                image_data_offset_x = -top_left_pixel.x;
+                top_left_pixel.x = 0;
+        } else if (top_left_pixel.x > (i32)frame_buffer->width) {
+                top_left_pixel.x = frame_buffer->width;
         }
-        if (max_y > frame_buffer->height) {
-                max_y = frame_buffer->height;
+        if (top_left_pixel.y < 0) {
+                image_data_offset_y = -top_left_pixel.y;
+                top_left_pixel.y = 0;
+        } else if (top_left_pixel.y > (i32)frame_buffer->height) {
+                top_left_pixel.y = frame_buffer->height;
+        }
+        if (bot_right_pixel.x < 0) {
+                bot_right_pixel.x = 0;
+        } else if (bot_right_pixel.x > (i32)frame_buffer->width) {
+                bot_right_pixel.x = frame_buffer->width;
+        }
+        if (bot_right_pixel.y < 0) {
+                bot_right_pixel.y = 0;
+        } else if (bot_right_pixel.y > (i32)frame_buffer->height) {
+                bot_right_pixel.y = frame_buffer->height;
         }
 
-        u32 *pixel = frame_buffer->pixels;
-        u32 *image_data = (u32 *)image->data;
-        for (u32 y = 0; y < max_y; ++y) {
-                for (u32 x = 0; x < max_x; ++x) {
-                        *pixel++ = *image_data++;
+        if (flip_x) {
+                u32 image_row = 0;
+                u32 *image_data = (u32 *)image->data + image_data_offset_x + (image_data_offset_y * image->width) +
+                                  (image->width - 1);
+                for (i32 i = top_left_pixel.y; i < bot_right_pixel.y; ++i) {
+                        for (i32 j = top_left_pixel.x; j < bot_right_pixel.x; ++j) {
+                                u32 *dest = &frame_buffer->pixels[j + i * frame_buffer->width];
+
+                                f32 dest_b = (f32)((*dest >> 16) & 0xFF);
+                                f32 dest_g = (f32)((*dest >> 8) & 0xFF);
+                                f32 dest_r = (f32)((*dest >> 0) & 0xFF);
+
+                                f32 src_a = (f32)((*image_data >> 24) & 0xFF) / 255.0f;
+                                f32 src_b = (f32)((*image_data >> 16) & 0xFF);
+                                f32 src_g = (f32)((*image_data >> 8) & 0xFF);
+                                f32 src_r = (f32)((*image_data >> 0) & 0xFF);
+
+                                f32 b = (1.0f - src_a) * dest_b + (src_a * src_b);
+                                f32 g = (1.0f - src_a) * dest_g + (src_a * src_g);
+                                f32 r = (1.0f - src_a) * dest_r + (src_a * src_r);
+
+                                *dest = (u32)(b + 0.5f) << 16 | (u32)(g + 0.5f) << 8 | (u32)(r + 0.5f) << 0;
+
+                                image_data--;
+                        }
+                        image_row++;
+                        image_data =
+                            (u32 *)image->data + (image_row * image->width) + image_data_offset_x + image->width;
                 }
-                pixel = &frame_buffer->pixels[y * frame_buffer->width];
+        } else {
+                u32 *image_data = (u32 *)image->data + image_data_offset_x + (image_data_offset_y * image->width);
+                for (i32 i = top_left_pixel.y; i < bot_right_pixel.y; ++i) {
+                        for (i32 j = top_left_pixel.x; j < bot_right_pixel.x; ++j) {
+                                u32 *dest = &frame_buffer->pixels[j + i * frame_buffer->width];
+
+                                f32 dest_b = (f32)((*dest >> 16) & 0xFF);
+                                f32 dest_g = (f32)((*dest >> 8) & 0xFF);
+                                f32 dest_r = (f32)((*dest >> 0) & 0xFF);
+
+                                f32 src_a = (f32)((*image_data >> 24) & 0xFF) / 255.0f;
+                                f32 src_b = (f32)((*image_data >> 16) & 0xFF);
+                                f32 src_g = (f32)((*image_data >> 8) & 0xFF);
+                                f32 src_r = (f32)((*image_data >> 0) & 0xFF);
+
+                                f32 b = (1.0f - src_a) * dest_b + (src_a * src_b);
+                                f32 g = (1.0f - src_a) * dest_g + (src_a * src_g);
+                                f32 r = (1.0f - src_a) * dest_r + (src_a * src_r);
+
+                                *dest = (u32)(b + 0.5f) << 16 | (u32)(g + 0.5f) << 8 | (u32)(r + 0.5f) << 0;
+
+                                image_data++;
+                        }
+                        image_data += image_data_offset_x;
+                }
         }
 }
 
@@ -68,28 +151,28 @@ static void draw_block(vec2f_t pos, vec2f_t size, vec2f_t draw_offset, game_fram
         bot_right_corner = vec2f_mul(bot_right_corner, units_to_pixels);
         vec2i_t top_left_pixel;
         vec2i_t bot_right_pixel;
-        vec2f_round2(top_left_corner, bot_right_corner, &top_left_pixel, &bot_right_pixel);
+        vec2f_floor2(top_left_corner, bot_right_corner, &top_left_pixel, &bot_right_pixel);
 
         // Bounds checking
         if (top_left_pixel.x < 0) {
                 top_left_pixel.x = 0;
-        } else if (top_left_pixel.x >= (i32)frame_buffer->width) {
-                top_left_pixel.x = frame_buffer->width - 1;
+        } else if (top_left_pixel.x > (i32)frame_buffer->width) {
+                top_left_pixel.x = frame_buffer->width;
         }
         if (top_left_pixel.y < 0) {
                 top_left_pixel.y = 0;
-        } else if (top_left_pixel.y >= (i32)frame_buffer->height) {
-                top_left_pixel.y = frame_buffer->height - 1;
+        } else if (top_left_pixel.y > (i32)frame_buffer->height) {
+                top_left_pixel.y = frame_buffer->height;
         }
         if (bot_right_pixel.x < 0) {
                 bot_right_pixel.x = 0;
-        } else if (bot_right_pixel.x >= (i32)frame_buffer->width) {
-                bot_right_pixel.x = frame_buffer->width - 1;
+        } else if (bot_right_pixel.x > (i32)frame_buffer->width) {
+                bot_right_pixel.x = frame_buffer->width;
         }
         if (bot_right_pixel.y < 0) {
                 bot_right_pixel.y = 0;
-        } else if (bot_right_pixel.y >= (i32)frame_buffer->height) {
-                bot_right_pixel.y = frame_buffer->height - 1;
+        } else if (bot_right_pixel.y > (i32)frame_buffer->height) {
+                bot_right_pixel.y = frame_buffer->height;
         }
 
         for (i32 i = top_left_pixel.y; i < bot_right_pixel.y; ++i) {
@@ -169,7 +252,7 @@ static ray_cast_result ray_cast_horizontal(vec2f_t origin, f32 end_x, tilemap_t 
         return result;
 }
 
-static void update_player_position(world_t *world, game_input_t *input)
+static vec2i_t update_player_position(world_t *world, game_input_t *input)
 {
         player_t *player = &world->player;
         // Ensures we never move exactly onto the tile we are colliding with.
@@ -187,9 +270,11 @@ static void update_player_position(world_t *world, game_input_t *input)
         }
 
         // NOTE(Wes): We always ray cast 4 times for movement:
-        // If we are moving left we cast left from the left side at the top and bottom of the player, vice versa for
+        // If we are moving left we cast left from the left side at the top and bottom of the player, vice versa
+        // for
         // right.
-        // If we are moving down we cast down from the bottom side at the left and right of the player, vice versa for
+        // If we are moving down we cast down from the bottom side at the left and right of the player, vice
+        // versa for
         // up.
         vec2f_t left_stick;
         vec2f_t right_stick;
@@ -203,8 +288,8 @@ static void update_player_position(world_t *world, game_input_t *input)
         world->draw_offset = vec2f_add(right_stick, world->draw_offset);
 
         // Friction force. USE ODE here!
-        vec2f_t friction = { -7.0f * player->velocity.x, 0.0f };
-        acceleration = vec2f_add(acceleration, friction); 
+        vec2f_t friction = {-7.0f * player->velocity.x, 0.0f};
+        acceleration = vec2f_add(acceleration, friction);
 
         f32 acceleration_factor = 5.0f;
         acceleration = vec2f_add(vec2f_mul(left_stick, acceleration_factor), acceleration);
@@ -269,6 +354,8 @@ static void update_player_position(world_t *world, game_input_t *input)
         } else {
                 player->on_ground = 0;
         }
+
+        return move_dir;
 }
 
 static image_t load_image(const char *path, map_file_fn map_file)
@@ -302,7 +389,7 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 game_state->world.player.position.x = 10.0f;
                 game_state->world.player.position.y = 10.0f;
                 game_state->world.player.size.x = 2.0f;
-                game_state->world.player.size.y = 2.0f;
+                game_state->world.player.size.y = 4.0f;
                 game_state->world.player.max_acceleration = 0.5f;
                 game_state->world.player.on_ground = 0;
                 game_state->world.player.jump_speed = 1000.0f;
@@ -312,11 +399,11 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
                     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
                     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
                     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
                     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
                     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+                    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
                     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
                     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
                     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -338,7 +425,8 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 game_state->world.tilemap.tiles_wide = 32;
                 game_state->world.tilemap.tiles_high = 18;
 
-                game_state->background_image = load_image("data/Background/Bg 1.png", callbacks->map_file);
+                game_state->background_image = load_image("data/background/Bg 1.png", callbacks->map_file);
+                game_state->player_image = load_image("data/player/walk_with_sword/1.png", callbacks->map_file);
 
                 memory->is_initialized = 1;
         }
@@ -355,17 +443,19 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 game_state->world.player.max_acceleration = 0.5f;
         }
 
-        draw_image(frame_buffer, &game_state->background_image);
+        vec2f_t background_pos = {40.0f, 30.0f};
+        vec2f_t zero_pos = {0.0f, 0.0f};
+        f32 units_to_pixels = game_state->world.units_to_pixels;
+        draw_image(background_pos, zero_pos, &game_state->background_image, frame_buffer, units_to_pixels, 0);
 
-        update_player_position(&game_state->world, input);
+        vec2i_t move_dir = update_player_position(&game_state->world, input);
 
         tilemap_t *tilemap = &game_state->world.tilemap;
-        f32 units_to_pixels = game_state->world.units_to_pixels;
         for (u32 i = 0; i < 18; ++i) {
                 for (u32 j = 0; j < 32; ++j) {
                         if (tilemap->tiles[j + i * tilemap->tiles_wide]) {
                                 vec2f_t tile_origin;
-                                tile_origin.x = (j * tilemap->tile_size.x);
+                                tile_origin.x = j * tilemap->tile_size.x;
                                 tile_origin.y = i * tilemap->tile_size.y;
                                 vec2f_t tile_half_size = vec2f_div(tilemap->tile_size, 2.0f);
                                 tile_origin = vec2f_add(tile_origin, tile_half_size);
@@ -377,6 +467,10 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
 
         draw_block(game_state->world.player.position, game_state->world.player.size, game_state->world.draw_offset,
                    frame_buffer, 0xFFFFFFFF, units_to_pixels);
+        vec2f_t player_draw_offset = {-0.3f, -0.4f};
+        vec2f_t player_draw_pos = vec2f_add(vec2f_copy(game_state->world.player.position), player_draw_offset);
+        draw_image(player_draw_pos, game_state->world.draw_offset, &game_state->player_image, frame_buffer,
+                   units_to_pixels, move_dir.x > 0);
 
         output_sine_wave(game_state, audio);
 }

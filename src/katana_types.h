@@ -49,6 +49,7 @@ typedef struct {
 typedef struct {
         world_t world;
         image_t background_image;
+        image_t player_image;
 
         f32 t_sine;
         i32 tone_hz;

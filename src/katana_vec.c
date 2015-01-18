@@ -65,6 +65,48 @@ void vec2f_round2(vec2f_t a, vec2f_t b, vec2i_t *a_result, vec2i_t *b_result)
         b_result->y = (i32)results[3];
 }
 
+void vec2f_floor2(vec2f_t a, vec2f_t b, vec2i_t *a_result, vec2i_t *b_result)
+{
+        assert(a_result);
+        assert(b_result);
+
+        f32 lhs[4];
+        f32 results[4];
+
+        lhs[0] = a.x;
+        lhs[1] = a.y;
+        lhs[2] = b.x;
+        lhs[3] = b.y;
+
+        floor4f(lhs, results);
+
+        a_result->x = (i32)results[0];
+        a_result->y = (i32)results[1];
+        b_result->x = (i32)results[2];
+        b_result->y = (i32)results[3];
+}
+
+void vec2f_ceil2(vec2f_t a, vec2f_t b, vec2i_t *a_result, vec2i_t *b_result)
+{
+        assert(a_result);
+        assert(b_result);
+
+        f32 lhs[4];
+        f32 results[4];
+
+        lhs[0] = a.x;
+        lhs[1] = a.y;
+        lhs[2] = b.x;
+        lhs[3] = b.y;
+
+        ceil4f(lhs, results);
+
+        a_result->x = (i32)results[0];
+        a_result->y = (i32)results[1];
+        b_result->x = (i32)results[2];
+        b_result->y = (i32)results[3];
+}
+
 // Converts the specified vector into 1 on each axis preserving the sign.
 vec2i_t vec2f_sign(vec2f_t src)
 {
