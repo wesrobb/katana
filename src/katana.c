@@ -1,5 +1,6 @@
 #include "katana_types.h"
 #include "katana_intrinsics.h"
+#include "katana_math.h"
 #include "katana_vec.c"
 
 #define STB_ASSERT(x) assert(x);
@@ -393,6 +394,7 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 game_state->world.player.max_acceleration = 0.5f;
                 game_state->world.player.on_ground = 0;
                 game_state->world.player.jump_speed = 1000.0f;
+                game_state->world.player.anim_fps = 24.0f;
                 static unsigned char tilemap[18][32] = {
                     {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
                     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -426,10 +428,17 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 game_state->world.tilemap.tiles_high = 18;
 
                 game_state->background_image = load_image("data/background/Bg 1.png", callbacks->map_file);
-                game_state->player_image = load_image("data/player/walk_with_sword/1.png", callbacks->map_file);
+                game_state->player_images[0] = load_image("data/player/walk_with_sword/1.png", callbacks->map_file);
+                game_state->player_images[1] = load_image("data/player/walk_with_sword/2.png", callbacks->map_file);
+                game_state->player_images[2] = load_image("data/player/walk_with_sword/3.png", callbacks->map_file);
+                game_state->player_images[3] = load_image("data/player/walk_with_sword/4.png", callbacks->map_file);
+                game_state->player_images[4] = load_image("data/player/walk_with_sword/5.png", callbacks->map_file);
+                game_state->player_images[5] = load_image("data/player/walk_with_sword/6.png", callbacks->map_file);
 
                 memory->is_initialized = 1;
         }
+
+        player_t *player = &game_state->world.player;
 
         if (input->controllers[0].left_shoulder.ended_down) {
                 game_state->world.units_to_pixels -= 0.1f;
@@ -438,9 +447,9 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
         }
 
         if (input->controllers[0].action_up.ended_down) {
-                game_state->world.player.max_acceleration = 1.0f;
+                player->max_acceleration = 1.0f;
         } else {
-                game_state->world.player.max_acceleration = 0.5f;
+                player->max_acceleration = 0.5f;
         }
 
         vec2f_t background_pos = {40.0f, 30.0f};
@@ -465,12 +474,27 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 }
         }
 
-        draw_block(game_state->world.player.position, game_state->world.player.size, game_state->world.draw_offset,
-                   frame_buffer, 0xFFFFFFFF, units_to_pixels);
+        // draw_block(player->position, player->size, game_state->world.draw_offset, frame_buffer, 0xFFFFFFFF,
+        //        units_to_pixels);
+
         vec2f_t player_draw_offset = {-0.3f, -0.4f};
-        vec2f_t player_draw_pos = vec2f_add(vec2f_copy(game_state->world.player.position), player_draw_offset);
-        draw_image(player_draw_pos, game_state->world.draw_offset, &game_state->player_image, frame_buffer,
-                   units_to_pixels, move_dir.x > 0);
+        vec2f_t player_draw_pos = vec2f_add(player->position, player_draw_offset);
+        image_t *player_image = 0;
+        if (input->controllers[0].left_stick_x == 0.0f) {
+                player_image = &game_state->player_images[player->anim_frame % 6];
+        } else {
+                player->anim_fps = katana_absf(input->controllers[0].left_stick_x) * 24.0f;
+                if (player->delta_accumulator + input->delta_time >= (1.0f / player->anim_fps)) {
+                        player->anim_frame++;
+                        player->delta_accumulator = 0;
+                } else {
+                        player->delta_accumulator += input->delta_time;
+                }
+                player_image = &game_state->player_images[player->anim_frame % 6];
+        }
+
+        draw_image(player_draw_pos, game_state->world.draw_offset, player_image, frame_buffer, units_to_pixels,
+                   move_dir.x > 0);
 
         output_sine_wave(game_state, audio);
 }
