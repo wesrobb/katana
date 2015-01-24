@@ -31,11 +31,10 @@ typedef struct {
         vec2f_t position;
         vec2f_t size;
         vec2f_t velocity;
-        f32 max_acceleration;
-        f32 jump_speed;
+        vec2f_t acceleration;
         u32 anim_frame;
         u32 anim_fps;
-        f32 delta_accumulator;
+        f32 anim_accumulator;
         b8 on_ground;
 } player_t;
 
@@ -52,6 +51,7 @@ typedef struct {
 typedef struct {
         world_t world;
         image_t background_image;
+        image_t tile_image;
         image_t player_images[6];
 
         f32 t_sine;
