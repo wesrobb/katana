@@ -76,16 +76,15 @@ static void draw_image(vec2f_t pos, vec2f_t size, vec2f_t draw_offset, image_t *
         vec2f_floor2(top_left_corner, bot_right_corner, &top_left_pixel, &bot_right_pixel);
 
         // Bounds checking
-        i32 image_data_offset_x = 0;
-        i32 image_data_offset_y = 0;
+        i32 image_data_offset_x = -top_left_pixel.x;
+        i32 image_data_offset_y = -top_left_pixel.y;
+        i32 flipped_image_data_offset_x = bot_right_pixel.x;
         if (top_left_pixel.x < 0) {
-                image_data_offset_x = -top_left_pixel.x;
                 top_left_pixel.x = 0;
         } else if (top_left_pixel.x > (i32)frame_buffer->width) {
                 top_left_pixel.x = frame_buffer->width;
         }
         if (top_left_pixel.y < 0) {
-                image_data_offset_y = -top_left_pixel.y;
                 top_left_pixel.y = 0;
         } else if (top_left_pixel.y > (i32)frame_buffer->height) {
                 top_left_pixel.y = frame_buffer->height;
@@ -103,19 +102,19 @@ static void draw_image(vec2f_t pos, vec2f_t size, vec2f_t draw_offset, image_t *
         u32 *image_data = (u32 *)image->data;
         if (flip_x) {
                 for (i32 i = top_left_pixel.y; i < bot_right_pixel.y; ++i) {
-                        u32 sample_y = (i - top_left_pixel.y) * y_ratio;
+                        u32 sample_y = (i + image_data_offset_y) * y_ratio;
                         for (i32 j = top_left_pixel.x; j < bot_right_pixel.x; ++j) {
                                 u32 *dest = &frame_buffer->pixels[j + i * frame_buffer->width];
-                                u32 sample_x = (bot_right_pixel.x - j) * x_ratio;
+                                u32 sample_x = (flipped_image_data_offset_x - j) * x_ratio;
                                 linear_blend(image_data[sample_x + sample_y * image->width], dest);
                         }
                 }
         } else {
                 for (i32 i = top_left_pixel.y; i < bot_right_pixel.y; ++i) {
-                        u32 sample_y = (i - top_left_pixel.y) * y_ratio;
+                        u32 sample_y = (i + image_data_offset_y) * y_ratio;
                         for (i32 j = top_left_pixel.x; j < bot_right_pixel.x; ++j) {
                                 u32 *dest = &frame_buffer->pixels[j + i * frame_buffer->width];
-                                u32 sample_x = (j - top_left_pixel.x) * x_ratio;
+                                u32 sample_x = (j + image_data_offset_x) * x_ratio;
                                 linear_blend(image_data[sample_x + sample_y * image->width], dest);
                         }
                 }
@@ -457,7 +456,7 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                                 vec2f_t tile_half_size = vec2f_div(tilemap->tile_size, 2.0f);
                                 tile_origin = vec2f_add(tile_origin, tile_half_size);
                                 draw_image(tile_origin, tilemap->tile_size, game_state->world.draw_offset,
-                                           &game_state->tile_image, frame_buffer, units_to_pixels, 0);
+                                           &game_state->tile_image, frame_buffer, units_to_pixels, 1);
                         }
                 }
         }
