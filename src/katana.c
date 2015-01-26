@@ -254,7 +254,7 @@ static vec2i_t update_player_position(world_t *world, game_input_t *input)
 
         // Jump
         if (input->controllers[0].action_down.ended_down && player->on_ground) {
-                player->velocity.y = -40.0f;
+                player->velocity.y = -60.0f;
         }
 
         // NOTE(Wes): We always ray cast 4 times for movement:
@@ -438,6 +438,22 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
         game_state->world.draw_offset = vec2f_copy(player->position);
         game_state->world.draw_offset.x -= frame_buffer->width / units_to_pixels / 2;
         game_state->world.draw_offset.y -= frame_buffer->height / units_to_pixels / 2;
+
+        // Clamp draw offset.
+        if (game_state->world.draw_offset.x < 0.0f) {
+                game_state->world.draw_offset.x = 0.0;
+        } else if (game_state->world.draw_offset.x + frame_buffer->width / units_to_pixels >=
+                   32 * game_state->world.tilemap.tile_size.x) {
+                game_state->world.draw_offset.x =
+                    (32 * game_state->world.tilemap.tile_size.x) - frame_buffer->width / units_to_pixels;
+        }
+        if (game_state->world.draw_offset.y < 0.0f) {
+                game_state->world.draw_offset.y = 0.0;
+        } else if (game_state->world.draw_offset.y + frame_buffer->height / units_to_pixels >=
+                   18 * game_state->world.tilemap.tile_size.y) {
+                game_state->world.draw_offset.y =
+                    (18 * game_state->world.tilemap.tile_size.y) - frame_buffer->height / units_to_pixels;
+        }
 
         vec2f_t background_pos = {64.0f, 36.0f};
         vec2f_t background_size = {128.0f, 72.0f};
