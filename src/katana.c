@@ -10,7 +10,7 @@
 
 static void output_sine_wave(game_state_t *game_state, game_audio_t *audio)
 {
-        i16 tone_volume = 3000;
+        //i16 tone_volume = 3000;
         i32 wave_period = audio->samples_per_second / game_state->tone_hz;
 
         i16 *sample_out = audio->samples;
