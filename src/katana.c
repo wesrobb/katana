@@ -10,7 +10,7 @@
 
 static void output_sine_wave(game_state_t *game_state, game_audio_t *audio)
 {
-        //i16 tone_volume = 3000;
+        // i16 tone_volume = 3000;
         i32 wave_period = audio->samples_per_second / game_state->tone_hz;
 
         i16 *sample_out = audio->samples;
@@ -52,6 +52,8 @@ static inline void linear_blend(u32 src, u32 *dest)
 static void draw_image(vec2f_t pos, vec2f_t size, vec2f_t draw_offset, image_t *image,
                        game_frame_buffer_t *frame_buffer, f32 units_to_pixels, b8 flip_x)
 {
+        assert(image);
+
         // Resizing ratio.
         vec2f_t actual_size;
         actual_size.x = image->width / units_to_pixels;
@@ -239,113 +241,126 @@ static ray_cast_result ray_cast_horizontal(vec2f_t origin, f32 end_x, tilemap_t 
         return result;
 }
 
-static vec2i_t update_player_position(world_t *world, game_input_t *input)
+static void update_entities(world_t *world, game_input_t *input)
 {
-        player_t *player = &world->player;
+        vec2f_t new_accels[KATANA_MAX_ENTITIES] = {};
 
-        // Ensures we never move exactly onto the tile we are colliding with.
-        f32 collision_buffer = 0.001f;
-        vec2f_t new_accel = {};
+        for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
+                u32 entity_index = world->controlled_entities[i];
+                if (entity_index != 0) {
+                        entity_t *entity = &world->enitities[entity_index];
+                        if (!entity->exists) {
+                        }
+                        game_controller_input_t *controller = &input->controllers[i];
 
-        vec2f_t half_player_size = vec2f_div(player->size, 2.0f);
+                        // Jump
+                        if (controller->action_down.ended_down && entity->on_ground) {
+                                entity->velocity.y = -80.0f;
+                        }
 
-        // Gravity
-        new_accel = vec2f_add(new_accel, world->gravity);
-
-        // Jump
-        if (input->controllers[0].action_down.ended_down && player->on_ground) {
-                player->velocity.y = -60.0f;
-        }
-
-        // NOTE(Wes): We always ray cast 4 times for movement:
-        // If we are moving left we cast left from the left side at the top and bottom of the player, vice versa
-        // for
-        // right.
-        // If we are moving down we cast down from the bottom side at the left and right of the player, vice
-        // versa for
-        // up.
-        vec2f_t left_stick;
-        vec2f_t right_stick;
-        left_stick.x = input->controllers[0].left_stick_x;
-        left_stick.y = 0.0f;
-        right_stick.x = input->controllers[0].right_stick_x;
-        right_stick.y = input->controllers[0].right_stick_y;
-
-        // TODO(Wes): Create an offset speed instead of using player speed.
-        right_stick = vec2f_mul(right_stick, 0.5f);
-        world->draw_offset = vec2f_add(right_stick, world->draw_offset);
-
-        // Friction force. USE ODE here!
-        vec2f_t friction = {-7.0f * player->velocity.x, 0.0f};
-        new_accel = vec2f_add(new_accel, friction);
-
-        // Verlet integration.
-        f32 acceleration_factor = 150.0f;
-        new_accel = vec2f_add(vec2f_mul(left_stick, acceleration_factor), new_accel);
-        vec2f_t average_accel = vec2f_div(vec2f_add(player->acceleration, new_accel), 2);
-        vec2f_t new_player_pos =
-            vec2f_mul(vec2f_mul(player->acceleration, 0.5f), input->delta_time * input->delta_time);
-        new_player_pos = vec2f_add(vec2f_mul(player->velocity, input->delta_time), new_player_pos);
-        new_player_pos = vec2f_add(player->position, new_player_pos);
-        player->velocity = vec2f_add(vec2f_mul(average_accel, input->delta_time), player->velocity);
-
-        // Get the movement direction as -1 = left/up, 0 = unused, 1 = right/down
-        vec2i_t move_dir = vec2f_sign(player->velocity);
-
-        // Horizontal collision check.
-        f32 cast_x = half_player_size.x * move_dir.x;
-        vec2f_t top_origin;
-        top_origin.x = player->position.x + cast_x;
-        top_origin.y = player->position.y - half_player_size.y + collision_buffer;
-        vec2f_t bot_origin;
-        bot_origin.x = top_origin.x;
-        bot_origin.y = player->position.y + half_player_size.y - collision_buffer;
-
-        f32 end_x = new_player_pos.x + cast_x;
-        ray_cast_result intersect_x1 = ray_cast_horizontal(top_origin, end_x, &world->tilemap);
-        ray_cast_result intersect_x2 = ray_cast_horizontal(bot_origin, end_x, &world->tilemap);
-
-        if ((move_dir.x * intersect_x1.intersect) <= (move_dir.x * intersect_x2.intersect)) {
-                player->position.x = intersect_x1.intersect - cast_x;
-        } else {
-                player->position.x = intersect_x2.intersect - cast_x;
-        }
-
-        if (intersect_x1.did_intersect || intersect_x2.did_intersect) {
-                player->velocity.x = 0.0f;
-        }
-
-        // Vertical collision check.
-        f32 cast_y = half_player_size.y * move_dir.y;
-        vec2f_t left_origin;
-        left_origin.x = player->position.x - half_player_size.x + collision_buffer;
-        left_origin.y = player->position.y + cast_y;
-        vec2f_t right_origin;
-        right_origin.x = player->position.x + half_player_size.x - collision_buffer;
-        right_origin.y = left_origin.y;
-
-        f32 end_y = new_player_pos.y + cast_y;
-        ray_cast_result intersect_y1 = ray_cast_vertical(left_origin, end_y, &world->tilemap);
-        ray_cast_result intersect_y2 = ray_cast_vertical(right_origin, end_y, &world->tilemap);
-
-        if ((move_dir.y * intersect_y1.intersect) <= (move_dir.y * intersect_y2.intersect)) {
-                player->position.y = intersect_y1.intersect - cast_y;
-        } else {
-                player->position.y = intersect_y2.intersect - cast_y;
-        }
-
-        if (intersect_y1.did_intersect || intersect_y2.did_intersect) {
-                player->velocity.y = 0.0f;
-                if (move_dir.y == 1) {
-                        player->on_ground = 1;
-                } else {
-                        player->on_ground = 0;
+                        // Move
+                        vec2f_t left_stick;
+                        left_stick.x = controller->left_stick_x;
+                        left_stick.y = 0.0f;
+                        f32 acceleration_factor = 150.0f;
+                        new_accels[entity_index] = vec2f_mul(left_stick, acceleration_factor);
                 }
-        } else {
-                player->on_ground = 0;
         }
 
-        return move_dir;
+        for (u32 i = 1; i < KATANA_MAX_ENTITIES; ++i) {
+                entity_t *entity = &world->enitities[i];
+                if (!entity->exists) {
+                        continue;
+                }
+
+                // Ensures we never move exactly onto the tile we are colliding with.
+                f32 collision_buffer = 0.001f;
+                vec2f_t new_accel = new_accels[i];
+
+                vec2f_t half_entity_size = vec2f_div(entity->size, 2.0f);
+
+                // Gravity
+                new_accel = vec2f_add(new_accel, world->gravity);
+
+                // NOTE(Wes): We always ray cast 4 times for movement:
+                // If we are moving left we cast left from the left side at the top and bottom of the entity, vice versa
+                // for
+                // right.
+                // If we are moving down we cast down from the bottom side at the left and right of the entity, vice
+                // versa for
+                // up.
+
+                // Friction force. USE ODE here!
+                vec2f_t friction = {-7.0f * entity->velocity.x, 0.0f};
+                new_accel = vec2f_add(new_accel, friction);
+
+                // Velocity verlet integration.
+                vec2f_t average_accel = vec2f_div(vec2f_add(entity->acceleration, new_accel), 2);
+                vec2f_t new_entity_pos =
+                    vec2f_mul(vec2f_mul(entity->acceleration, 0.5f), input->delta_time * input->delta_time);
+                new_entity_pos = vec2f_add(vec2f_mul(entity->velocity, input->delta_time), new_entity_pos);
+                new_entity_pos = vec2f_add(entity->position, new_entity_pos);
+                entity->velocity = vec2f_add(vec2f_mul(average_accel, input->delta_time), entity->velocity);
+                entity->acceleration = new_accel;
+
+                // Get the movement direction as -1 = left/up, 0 = unused, 1 = right/down
+                vec2i_t move_dir = vec2f_sign(entity->velocity);
+
+                // Horizontal collision check.
+                f32 cast_x = half_entity_size.x * move_dir.x;
+                vec2f_t top_origin;
+                top_origin.x = entity->position.x + cast_x;
+                top_origin.y = entity->position.y - half_entity_size.y + collision_buffer;
+                vec2f_t bot_origin;
+                bot_origin.x = top_origin.x;
+                bot_origin.y = entity->position.y + half_entity_size.y - collision_buffer;
+
+                f32 end_x = new_entity_pos.x + cast_x;
+                ray_cast_result intersect_x1 = ray_cast_horizontal(top_origin, end_x, &world->tilemap);
+                ray_cast_result intersect_x2 = ray_cast_horizontal(bot_origin, end_x, &world->tilemap);
+
+                if ((move_dir.x * intersect_x1.intersect) <= (move_dir.x * intersect_x2.intersect)) {
+                        entity->position.x = intersect_x1.intersect - cast_x;
+                } else {
+                        entity->position.x = intersect_x2.intersect - cast_x;
+                }
+
+                if (intersect_x1.did_intersect || intersect_x2.did_intersect) {
+                        entity->velocity.x = 0.0f;
+                        entity->acceleration.x = 0.0f;
+                }
+
+                // Vertical collision check.
+                f32 cast_y = half_entity_size.y * move_dir.y;
+                vec2f_t left_origin;
+                left_origin.x = entity->position.x - half_entity_size.x + collision_buffer;
+                left_origin.y = entity->position.y + cast_y;
+                vec2f_t right_origin;
+                right_origin.x = entity->position.x + half_entity_size.x - collision_buffer;
+                right_origin.y = left_origin.y;
+
+                f32 end_y = new_entity_pos.y + cast_y;
+                ray_cast_result intersect_y1 = ray_cast_vertical(left_origin, end_y, &world->tilemap);
+                ray_cast_result intersect_y2 = ray_cast_vertical(right_origin, end_y, &world->tilemap);
+
+                if ((move_dir.y * intersect_y1.intersect) <= (move_dir.y * intersect_y2.intersect)) {
+                        entity->position.y = intersect_y1.intersect - cast_y;
+                } else {
+                        entity->position.y = intersect_y2.intersect - cast_y;
+                }
+
+                if (intersect_y1.did_intersect || intersect_y2.did_intersect) {
+                        entity->velocity.y = 0.0f;
+                        entity->acceleration.y = 0.0f;
+                        if (move_dir.y == 1) {
+                                entity->on_ground = 1;
+                        } else {
+                                entity->on_ground = 0;
+                        }
+                } else {
+                        entity->on_ground = 0;
+                }
+        }
 }
 
 static image_t load_image(const char *path, map_file_fn map_file)
@@ -358,6 +373,17 @@ static image_t load_image(const char *path, map_file_fn map_file)
         result.data = stbi_load_from_memory(mapped_file.contents, mapped_file.size, &result.width, &result.height,
                                             &components, required_components);
         return result;
+}
+
+static u32 get_next_entity(entity_t *entities)
+{
+        for (u32 i = 1; i < KATANA_MAX_ENTITIES; ++i) {
+                if (!entities[i].exists) {
+                        return i;
+                }
+        }
+
+        return 0;
 }
 
 void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_buffer, game_audio_t *audio,
@@ -376,12 +402,6 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 game_state->world.gravity.y = 9.8f * 20;
                 game_state->t_sine = 0.0f;
                 game_state->tone_hz = 512;
-                game_state->world.player.position.x = 20.0f;
-                game_state->world.player.position.y = 20.0f;
-                game_state->world.player.size.x = 2.0f;
-                game_state->world.player.size.y = 4.0f;
-                game_state->world.player.on_ground = 0;
-                game_state->world.player.anim_fps = 24.0f;
                 static unsigned char tilemap[18][32] = {
                     {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
                     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -426,7 +446,28 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 memory->is_initialized = 1;
         }
 
-        player_t *player = &game_state->world.player;
+        for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
+                game_controller_input_t *controller = &input->controllers[i];
+                u32 controlled_entity = game_state->world.controlled_entities[i];
+                if (controller->start.ended_down && !controlled_entity) {
+                        controlled_entity = get_next_entity(game_state->world.enitities);
+                        game_state->world.controlled_entities[i] = controlled_entity;
+
+                        // NOTE(Wes): Initialize the player
+                        entity_t *entity = &game_state->world.enitities[controlled_entity];
+                        entity->position.x = 20.0f;
+                        entity->position.y = 20.0f;
+                        entity->size.x = 2.0f;
+                        entity->size.y = 4.0f;
+                        entity->exists = 1;
+
+                        entity_anim_t *anim = &game_state->world.entity_anims[controlled_entity];
+                        anim->frames = game_state->player_images;
+                        anim->max_frames = 6;
+                        anim->fps = 24.0f;
+                        anim->exists = 1;
+                }
+        }
 
         if (input->controllers[0].left_shoulder.ended_down) {
                 game_state->world.units_to_pixels -= 0.1f;
@@ -435,7 +476,7 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
         }
 
         f32 units_to_pixels = game_state->world.units_to_pixels;
-        game_state->world.draw_offset = vec2f_copy(player->position);
+        game_state->world.draw_offset = game_state->world.enitities[1].position;
         game_state->world.draw_offset.x -= frame_buffer->width / units_to_pixels / 2;
         game_state->world.draw_offset.y -= frame_buffer->height / units_to_pixels / 2;
 
@@ -460,7 +501,7 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
         draw_image(background_pos, background_size, game_state->world.draw_offset, &game_state->background_image,
                    frame_buffer, units_to_pixels, 0);
 
-        vec2i_t move_dir = update_player_position(&game_state->world, input);
+        update_entities(&game_state->world, input);
 
         tilemap_t *tilemap = &game_state->world.tilemap;
         for (u32 i = 0; i < 18; ++i) {
@@ -480,25 +521,39 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
         // draw_block(player->position, player->size, game_state->world.draw_offset, frame_buffer, 0xFFFFFFFF,
         //          units_to_pixels);
 
-        vec2f_t player_draw_offset = {-0.3f, -0.4f};
-        vec2f_t player_draw_pos = vec2f_add(player->position, player_draw_offset);
-        vec2f_t player_size = {8.0f, 5.0f};
-        image_t *player_image = 0;
-        if (input->controllers[0].left_stick_x == 0.0f) {
-                player_image = &game_state->player_images[player->anim_frame % 6];
-        } else {
-                f32 anim_fps = katana_absf(input->controllers[0].left_stick_x) * player->anim_fps;
-                if (player->anim_accumulator + input->delta_time >= (1.0f / anim_fps)) {
-                        player->anim_frame++;
-                        player->anim_accumulator = 0;
-                } else {
-                        player->anim_accumulator += input->delta_time;
+        for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
+                u32 controlled_entity = game_state->world.controlled_entities[i];
+                if (controlled_entity == 0) {
+                        continue;
                 }
-                player_image = &game_state->player_images[player->anim_frame % 6];
-        }
+                entity_t *entity = &game_state->world.enitities[controlled_entity];
+                if (!entity->exists) {
+                        continue;
+                }
 
-        draw_image(player_draw_pos, player_size, game_state->world.draw_offset, player_image, frame_buffer,
-                   units_to_pixels, move_dir.x > 0);
+                entity_anim_t *anim = &game_state->world.entity_anims[controlled_entity];
+                image_t *entity_frame = 0;
+                if (anim->exists) {
+                        if (input->controllers[i].left_stick_x == 0.0f) {
+                                entity_frame = &anim->frames[anim->current_frame];
+                        } else {
+                                f32 anim_fps = katana_absf(input->controllers[i].left_stick_x) * anim->fps;
+                                if (anim->accumulator + input->delta_time >= (1.0f / anim_fps)) {
+                                        anim->current_frame = ++anim->current_frame % anim->max_frames;
+                                        anim->accumulator = 0;
+                                } else {
+                                        anim->accumulator += input->delta_time;
+                                }
+                                entity_frame = &anim->frames[anim->current_frame];
+                        }
+                }
+
+                vec2f_t draw_offset = {-0.3f, -0.4f};
+                vec2f_t size = {8.0f, 5.0f};
+                vec2f_t draw_pos = vec2f_add(entity->position, draw_offset);
+                draw_image(draw_pos, size, game_state->world.draw_offset, entity_frame, frame_buffer, units_to_pixels,
+                           entity->velocity.x > 0);
+        }
 
         output_sine_wave(game_state, audio);
 }

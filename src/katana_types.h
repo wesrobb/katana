@@ -2,8 +2,6 @@
 
 #include "katana_platform.h"
 
-#include <immintrin.h>
-
 typedef struct {
         i32 x;
         i32 y;
@@ -28,23 +26,31 @@ typedef struct {
 } tilemap_t;
 
 typedef struct {
+        u32 max_frames;
+        u32 current_frame;
+        u32 fps;
+        f32 accumulator;
+        image_t *frames;
+        b8 exists;
+} entity_anim_t;
+
+typedef struct {
         vec2f_t position;
         vec2f_t size;
         vec2f_t velocity;
         vec2f_t acceleration;
-        u32 anim_frame;
-        u32 anim_fps;
-        f32 anim_accumulator;
         b8 on_ground;
-} player_t;
+        b8 exists;
+} entity_t;
 
+#define KATANA_MAX_ENTITIES 512
 typedef struct {
-        player_t player;
+        entity_t enitities[KATANA_MAX_ENTITIES]; // Entity 0 is the "null" entity
+        entity_anim_t entity_anims[KATANA_MAX_ENTITIES];
+        u32 controlled_entities[KATANA_MAX_CONTROLLERS];
         tilemap_t tilemap;
         vec2f_t draw_offset;
         vec2f_t gravity; // units/sec^2
-        // Everything is measured in units, only during drawing
-        // do we convert to pixels.
         f32 units_to_pixels;
 } world_t;
 

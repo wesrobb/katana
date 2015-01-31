@@ -49,7 +49,6 @@ typedef struct {
         b8 ended_down;
 } game_button_state_t;
 
-#define KATANA_MAX_STICK_VALUES 16
 typedef struct {
         b8 is_connected;
         b8 is_analog;
