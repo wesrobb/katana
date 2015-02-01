@@ -8,6 +8,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include <float.h>
+
 static void output_sine_wave(game_state_t *game_state, game_audio_t *audio)
 {
         // i16 tone_volume = 3000;
@@ -469,17 +471,50 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 }
         }
 
-        if (input->controllers[0].left_shoulder.ended_down) {
-                game_state->world.units_to_pixels -= 0.1f;
-        } else if (input->controllers[0].right_shoulder.ended_down) {
-                game_state->world.units_to_pixels += 0.1f;
+        update_entities(&game_state->world, input);
+
+        // Update draw offset and units_to_pixels so that camera always sees all players
+        vec2f_t min_pos = {FLT_MAX, FLT_MAX};
+        vec2f_t max_pos = {FLT_MIN, FLT_MIN};
+        b8 entity_found = 0;
+        for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
+                u32 controlled_entity = game_state->world.controlled_entities[i];
+                if (controlled_entity != 0) {
+                        entity_t *entity = &game_state->world.enitities[controlled_entity];
+                        if (entity->exists) {
+                                entity_found = 1;
+                                f32 x_pos = entity->position.x;
+                                f32 y_pos = entity->position.y;
+                                if (x_pos < min_pos.x) {
+                                        min_pos.x = x_pos;
+                                }
+                                if (y_pos < min_pos.y) {
+                                        min_pos.y = y_pos;
+                                }
+                                if (x_pos > max_pos.x) {
+                                        max_pos.x = x_pos;
+                                }
+                                if (y_pos > max_pos.y) {
+                                        max_pos.y = y_pos;
+                                }
+                        }
+                }
         }
 
-        f32 units_to_pixels = game_state->world.units_to_pixels;
-        game_state->world.draw_offset = game_state->world.enitities[1].position;
-        game_state->world.draw_offset.x -= frame_buffer->width / units_to_pixels / 2;
-        game_state->world.draw_offset.y -= frame_buffer->height / units_to_pixels / 2;
+        vec2f_t camera_edge_buffer = {16.0f, 16.0f};
+        min_pos = vec2f_sub(min_pos, camera_edge_buffer);
 
+        game_state->world.draw_offset = min_pos;
+        vec2f_t screen_span = vec2f_sub(vec2f_add(max_pos, camera_edge_buffer), min_pos);
+
+        f32 x_units_to_pixels = frame_buffer->width / screen_span.x;
+        f32 y_units_to_pixels = frame_buffer->height / screen_span.y;
+
+        game_state->world.units_to_pixels =
+            x_units_to_pixels < y_units_to_pixels ? x_units_to_pixels : y_units_to_pixels;
+        f32 units_to_pixels = game_state->world.units_to_pixels;
+
+#if 1
         // Clamp draw offset.
         if (game_state->world.draw_offset.x < 0.0f) {
                 game_state->world.draw_offset.x = 0.0;
@@ -495,13 +530,12 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 game_state->world.draw_offset.y =
                     (18 * game_state->world.tilemap.tile_size.y) - frame_buffer->height / units_to_pixels;
         }
+#endif
 
         vec2f_t background_pos = {64.0f, 36.0f};
         vec2f_t background_size = {128.0f, 72.0f};
         draw_image(background_pos, background_size, game_state->world.draw_offset, &game_state->background_image,
                    frame_buffer, units_to_pixels, 0);
-
-        update_entities(&game_state->world, input);
 
         tilemap_t *tilemap = &game_state->world.tilemap;
         for (u32 i = 0; i < 18; ++i) {
