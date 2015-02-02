@@ -222,8 +222,10 @@ int main(void)
                                               window_width, window_height, SDL_WINDOW_RESIZABLE);
 
         SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+        u32 frame_buffer_width = 1280;
+        u32 frame_buffer_height = 720;
         SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING,
-                                                 window_width, window_height);
+                                                 frame_buffer_width, frame_buffer_height);
 
         SDL_AudioSpec audio_spec_want = {};
         audio_spec_want.freq = 48000;
@@ -243,8 +245,8 @@ int main(void)
         osx_game_t game = {};
 
         game_frame_buffer_t frame_buffer = {};
-        frame_buffer.width = window_width;
-        frame_buffer.height = window_height;
+        frame_buffer.width = frame_buffer_width;
+        frame_buffer.height = frame_buffer_height;
 
         i32 max_joysticks = SDL_NumJoysticks();
         i32 controller_index = 0;

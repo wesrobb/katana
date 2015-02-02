@@ -398,8 +398,8 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
         game_state_t *game_state = (game_state_t *)memory->transient_store;
         if (!memory->is_initialized) {
                 game_state->world.units_to_pixels = 20.0f / 1.0f;
-                game_state->world.draw_offset.x = 0.0f;
-                game_state->world.draw_offset.y = 0.0f;
+                game_state->world.draw_offset.x = 10.0f;
+                game_state->world.draw_offset.y = 10.0f;
                 game_state->world.gravity.x = 0.0f;
                 game_state->world.gravity.y = 9.8f * 20;
                 game_state->t_sine = 0.0f;
@@ -500,21 +500,26 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                         }
                 }
         }
+        if (!entity_found) {
+                min_pos.x = 10.0f;
+                min_pos.y = 10.0f;
+        }
 
-        vec2f_t camera_edge_buffer = {16.0f, 16.0f};
+        vec2f_t camera_edge_buffer = {32.0f, 32.0f};
         min_pos = vec2f_sub(min_pos, camera_edge_buffer);
 
-        game_state->world.draw_offset = min_pos;
+        game_state->world.draw_offset = vec2f_add(vec2f_mul(game_state->world.draw_offset, (1.0f - input->delta_time)),
+                                                  vec2f_mul(min_pos, input->delta_time));
         vec2f_t screen_span = vec2f_sub(vec2f_add(max_pos, camera_edge_buffer), min_pos);
 
         f32 x_units_to_pixels = frame_buffer->width / screen_span.x;
         f32 y_units_to_pixels = frame_buffer->height / screen_span.y;
 
+        f32 units_to_pixels = x_units_to_pixels < y_units_to_pixels ? x_units_to_pixels : y_units_to_pixels;
         game_state->world.units_to_pixels =
-            x_units_to_pixels < y_units_to_pixels ? x_units_to_pixels : y_units_to_pixels;
-        f32 units_to_pixels = game_state->world.units_to_pixels;
+            (game_state->world.units_to_pixels * (1.0f - input->delta_time)) + (units_to_pixels * input->delta_time);
 
-#if 1
+#if 0
         // Clamp draw offset.
         if (game_state->world.draw_offset.x < 0.0f) {
                 game_state->world.draw_offset.x = 0.0;
@@ -535,7 +540,7 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
         vec2f_t background_pos = {64.0f, 36.0f};
         vec2f_t background_size = {128.0f, 72.0f};
         draw_image(background_pos, background_size, game_state->world.draw_offset, &game_state->background_image,
-                   frame_buffer, units_to_pixels, 0);
+                   frame_buffer, game_state->world.units_to_pixels, 0);
 
         tilemap_t *tilemap = &game_state->world.tilemap;
         for (u32 i = 0; i < 18; ++i) {
@@ -547,7 +552,7 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                                 vec2f_t tile_half_size = vec2f_div(tilemap->tile_size, 2.0f);
                                 tile_origin = vec2f_add(tile_origin, tile_half_size);
                                 draw_image(tile_origin, tilemap->tile_size, game_state->world.draw_offset,
-                                           &game_state->tile_image, frame_buffer, units_to_pixels, 1);
+                                           &game_state->tile_image, frame_buffer, game_state->world.units_to_pixels, 1);
                         }
                 }
         }
@@ -585,8 +590,8 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 vec2f_t draw_offset = {-0.3f, -0.4f};
                 vec2f_t size = {8.0f, 5.0f};
                 vec2f_t draw_pos = vec2f_add(entity->position, draw_offset);
-                draw_image(draw_pos, size, game_state->world.draw_offset, entity_frame, frame_buffer, units_to_pixels,
-                           entity->velocity.x > 0);
+                draw_image(draw_pos, size, game_state->world.draw_offset, entity_frame, frame_buffer,
+                           game_state->world.units_to_pixels, entity->velocity.x > 0);
         }
 
         output_sine_wave(game_state, audio);
