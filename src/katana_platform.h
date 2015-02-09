@@ -16,6 +16,9 @@
 #define set_alignment(BYTE_COUNT) __attribute__((__aligned__(BYTE_COUNT)))
 #define is_aligned(POINTER, BYTE_COUNT) (((uintptr_t)(const void *)(POINTER)) % (BYTE_COUNT) == 0)
 
+#define min(a, b) a < b ? a : b
+#define max(a, b) a > b ? a : b
+
 typedef unsigned char b8;
 typedef int8_t i8;
 typedef uint8_t u8;

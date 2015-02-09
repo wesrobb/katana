@@ -35,20 +35,20 @@ static void output_sine_wave(game_state_t *game_state, game_audio_t *audio)
 
 static inline void linear_blend(u32 src, u32 *dest)
 {
-        f32 dest_b = (f32)((*dest >> 16) & 0xFF);
-        f32 dest_g = (f32)((*dest >> 8) & 0xFF);
-        f32 dest_r = (f32)((*dest >> 0) & 0xFF);
+        u8 dest_b = (*dest >> 16) & 0xFF;
+        u8 dest_g = (*dest >> 8) & 0xFF;
+        u8 dest_r = (*dest >> 0) & 0xFF;
 
-        f32 src_a = (f32)((src >> 24) & 0xFF) / 255.0f;
-        f32 src_b = (f32)((src >> 16) & 0xFF);
-        f32 src_g = (f32)((src >> 8) & 0xFF);
-        f32 src_r = (f32)((src >> 0) & 0xFF);
+        u8 src_a = (src >> 24) & 0xFF;
+        u8 src_b = (src >> 16) & 0xFF;
+        u8 src_g = (src >> 8) & 0xFF;
+        u8 src_r = (src >> 0) & 0xFF;
 
-        f32 b = (1.0f - src_a) * dest_b + (src_a * src_b);
-        f32 g = (1.0f - src_a) * dest_g + (src_a * src_g);
-        f32 r = (1.0f - src_a) * dest_r + (src_a * src_r);
+        u8 b = ((src_b * src_a) + (dest_b * (255 - src_a))) >> 8;
+        u8 g = ((src_g * src_a) + (dest_g * (255 - src_a))) >> 8;
+        u8 r = ((src_r * src_a) + (dest_r * (255 - src_a))) >> 8;
 
-        *dest = (u32)(b + 0.5f) << 16 | (u32)(g + 0.5f) << 8 | (u32)(r + 0.5f) << 0;
+        *dest = (u32)b << 16 | (u32)g << 8 | (u32)r;
 }
 
 static void draw_image(vec2f_t pos, vec2f_t size, vec2f_t draw_offset, image_t *image,
@@ -243,6 +243,28 @@ static ray_cast_result ray_cast_horizontal(vec2f_t origin, f32 end_x, tilemap_t 
         return result;
 }
 
+static u32 get_next_entity(entity_t *entities)
+{
+        static const entity_t zero_entity = {};
+        for (u32 i = 1; i < KATANA_MAX_ENTITIES; ++i) {
+                entity_t *entity = &entities[i];
+                if (!entity->exists) {
+                        *entity = zero_entity;
+                        entity->exists = 1;
+                        return i;
+                }
+        }
+
+        return 0;
+}
+
+static void free_entity(entity_t *entities, u32 index)
+{
+        static const entity_t zero_entity = {};
+        assert(index < KATANA_MAX_ENTITIES);
+        entities[index] = zero_entity;
+}
+
 static void update_entities(world_t *world, game_input_t *input)
 {
         vec2f_t new_accels[KATANA_MAX_ENTITIES] = {};
@@ -250,7 +272,7 @@ static void update_entities(world_t *world, game_input_t *input)
         for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
                 u32 entity_index = world->controlled_entities[i];
                 if (entity_index != 0) {
-                        entity_t *entity = &world->enitities[entity_index];
+                        entity_t *entity = &world->entities[entity_index];
                         if (!entity->exists) {
                         }
                         game_controller_input_t *controller = &input->controllers[i];
@@ -258,6 +280,34 @@ static void update_entities(world_t *world, game_input_t *input)
                         // Jump
                         if (controller->action_down.ended_down && entity->on_ground) {
                                 entity->velocity.y = -80.0f;
+                        }
+
+                        // Throw teleporter
+                        if (controller->right_shoulder.ended_down && !entity->teleporter_index) {
+                                entity->teleporter_index = get_next_entity(world->entities);
+                                if (entity->teleporter_index != 0) {
+                                        entity_t *teleporter_entity = &world->entities[entity->teleporter_index];
+                                        teleporter_entity->position = entity->position;
+                                        teleporter_entity->velocity = entity->velocity;
+                                        teleporter_entity->size.x = 2.0f;
+                                        teleporter_entity->size.y = 2.0f;
+                                        vec2f_t left_stick;
+                                        left_stick.x = controller->left_stick_x;
+                                        left_stick.y = controller->left_stick_y;
+                                        f32 speed = 100.0f;
+                                        teleporter_entity->velocity = vec2f_mul(left_stick, speed);
+                                        f32 acceleration_factor = 150.0f;
+                                        new_accels[entity->teleporter_index] =
+                                            vec2f_mul(left_stick, acceleration_factor);
+                                }
+                        }
+
+                        // Teleport
+                        if (controller->left_shoulder.ended_down && entity->teleporter_index) {
+                                entity_t *teleporter_entity = &world->entities[entity->teleporter_index];
+                                entity->position = teleporter_entity->position;
+                                free_entity(world->entities, entity->teleporter_index);
+                                entity->teleporter_index = 0;
                         }
 
                         // Move
@@ -270,7 +320,7 @@ static void update_entities(world_t *world, game_input_t *input)
         }
 
         for (u32 i = 1; i < KATANA_MAX_ENTITIES; ++i) {
-                entity_t *entity = &world->enitities[i];
+                entity_t *entity = &world->entities[i];
                 if (!entity->exists) {
                         continue;
                 }
@@ -377,17 +427,6 @@ static image_t load_image(const char *path, map_file_fn map_file)
         return result;
 }
 
-static u32 get_next_entity(entity_t *entities)
-{
-        for (u32 i = 1; i < KATANA_MAX_ENTITIES; ++i) {
-                if (!entities[i].exists) {
-                        return i;
-                }
-        }
-
-        return 0;
-}
-
 void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_buffer, game_audio_t *audio,
                             game_input_t *input, game_output_t *output, game_callbacks_t *callbacks)
 {
@@ -395,7 +434,8 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 return;
         }
 
-        game_state_t *game_state = (game_state_t *)memory->transient_store;
+        assert(sizeof(game_state_t) <= memory->permanent_store_size);
+        game_state_t *game_state = (game_state_t *)memory->permanent_store;
         if (!memory->is_initialized) {
                 game_state->world.units_to_pixels = 20.0f / 1.0f;
                 game_state->world.draw_offset.x = 10.0f;
@@ -444,6 +484,10 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 game_state->player_images[3] = load_image("data/player/walk_with_sword/4.png", callbacks->map_file);
                 game_state->player_images[4] = load_image("data/player/walk_with_sword/5.png", callbacks->map_file);
                 game_state->player_images[5] = load_image("data/player/walk_with_sword/6.png", callbacks->map_file);
+                game_state->green_teleporter = load_image("data/teleporter/green.png", callbacks->map_file);
+
+                init_arena(&game_state->arena, memory->permanent_store_size - sizeof(game_state_t),
+                           memory->permanent_store + sizeof(game_state_t));
 
                 memory->is_initialized = 1;
         }
@@ -452,11 +496,11 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 game_controller_input_t *controller = &input->controllers[i];
                 u32 controlled_entity = game_state->world.controlled_entities[i];
                 if (controller->start.ended_down && !controlled_entity) {
-                        controlled_entity = get_next_entity(game_state->world.enitities);
+                        controlled_entity = get_next_entity(game_state->world.entities);
                         game_state->world.controlled_entities[i] = controlled_entity;
 
                         // NOTE(Wes): Initialize the player
-                        entity_t *entity = &game_state->world.enitities[controlled_entity];
+                        entity_t *entity = &game_state->world.entities[controlled_entity];
                         entity->position.x = 20.0f;
                         entity->position.y = 20.0f;
                         entity->size.x = 2.0f;
@@ -480,7 +524,7 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
         for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
                 u32 controlled_entity = game_state->world.controlled_entities[i];
                 if (controlled_entity != 0) {
-                        entity_t *entity = &game_state->world.enitities[controlled_entity];
+                        entity_t *entity = &game_state->world.entities[controlled_entity];
                         if (entity->exists) {
                                 entity_found = 1;
                                 f32 x_pos = entity->position.x;
@@ -565,7 +609,7 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 if (controlled_entity == 0) {
                         continue;
                 }
-                entity_t *entity = &game_state->world.enitities[controlled_entity];
+                entity_t *entity = &game_state->world.entities[controlled_entity];
                 if (!entity->exists) {
                         continue;
                 }
@@ -592,6 +636,12 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 vec2f_t draw_pos = vec2f_add(entity->position, draw_offset);
                 draw_image(draw_pos, size, game_state->world.draw_offset, entity_frame, frame_buffer,
                            game_state->world.units_to_pixels, entity->velocity.x > 0);
+
+                if (entity->teleporter_index) {
+                        entity_t *teleporter = &game_state->world.entities[entity->teleporter_index];
+                        draw_image(teleporter->position, teleporter->size, game_state->world.draw_offset,
+                                   &game_state->green_teleporter, frame_buffer, game_state->world.units_to_pixels, 0);
+                }
         }
 
         output_sine_wave(game_state, audio);
