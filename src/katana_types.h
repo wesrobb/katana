@@ -58,11 +58,18 @@ typedef struct {
         b8 exists;
 } entity_anim_t;
 
+typedef enum { entity_type_player, entity_type_teleporter } entity_type_t;
+
 typedef struct {
         vec2f_t position;
         vec2f_t size;
         vec2f_t velocity;
         vec2f_t acceleration;
+
+        f32 velocity_factor;
+        f32 acceleration_factor;
+
+        entity_type_t type;
         u32 teleporter_index;
         b8 on_ground;
         b8 exists;

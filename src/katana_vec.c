@@ -1,9 +1,9 @@
 #include "katana_types.h"
 #include "katana_intrinsics.h"
 
-vec2f_t vec2f_copy(vec2f_t src)
+vec2f_t vec2f(f32 x, f32 y)
 {
-        vec2f_t dst = {src.x, src.y};
+        vec2f_t dst = {x, y};
         return dst;
 }
 

@@ -287,18 +287,21 @@ static void update_entities(world_t *world, game_input_t *input)
                                 entity->teleporter_index = get_next_entity(world->entities);
                                 if (entity->teleporter_index != 0) {
                                         entity_t *teleporter_entity = &world->entities[entity->teleporter_index];
+                                        teleporter_entity->type = entity_type_teleporter;
                                         teleporter_entity->position = entity->position;
                                         teleporter_entity->velocity = entity->velocity;
                                         teleporter_entity->size.x = 2.0f;
                                         teleporter_entity->size.y = 2.0f;
+                                        teleporter_entity->velocity_factor = -2.0f;
+                                        teleporter_entity->acceleration_factor = 100.0f;
                                         vec2f_t left_stick;
                                         left_stick.x = controller->left_stick_x;
                                         left_stick.y = controller->left_stick_y;
-                                        f32 speed = 100.0f;
-                                        teleporter_entity->velocity = vec2f_mul(left_stick, speed);
-                                        f32 acceleration_factor = 150.0f;
-                                        new_accels[entity->teleporter_index] =
-                                            vec2f_mul(left_stick, acceleration_factor);
+                                        teleporter_entity->velocity =
+                                            vec2f_mul(left_stick, teleporter_entity->acceleration_factor);
+                                        // f32 acceleration_factor = 150.0f;
+                                        // new_accels[entity->teleporter_index] =
+                                        //   vec2f_mul(left_stick, acceleration_factor);
                                 }
                         }
 
@@ -314,8 +317,7 @@ static void update_entities(world_t *world, game_input_t *input)
                         vec2f_t left_stick;
                         left_stick.x = controller->left_stick_x;
                         left_stick.y = 0.0f;
-                        f32 acceleration_factor = 150.0f;
-                        new_accels[entity_index] = vec2f_mul(left_stick, acceleration_factor);
+                        new_accels[entity_index] = vec2f_mul(left_stick, entity->acceleration_factor);
                 }
         }
 
@@ -343,7 +345,7 @@ static void update_entities(world_t *world, game_input_t *input)
                 // up.
 
                 // Friction force. USE ODE here!
-                vec2f_t friction = {-7.0f * entity->velocity.x, 0.0f};
+                vec2f_t friction = vec2f(entity->velocity_factor * entity->velocity.x, 0.0f);
                 new_accel = vec2f_add(new_accel, friction);
 
                 // Velocity verlet integration.
@@ -501,11 +503,14 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
 
                         // NOTE(Wes): Initialize the player
                         entity_t *entity = &game_state->world.entities[controlled_entity];
+                        entity->type = entity_type_player;
                         entity->position.x = 20.0f;
                         entity->position.y = 20.0f;
                         entity->size.x = 2.0f;
                         entity->size.y = 4.0f;
                         entity->exists = 1;
+                        entity->velocity_factor = -7.0f; // Drag
+                        entity->acceleration_factor = 150.0f;
 
                         entity_anim_t *anim = &game_state->world.entity_anims[controlled_entity];
                         anim->frames = game_state->player_images;
