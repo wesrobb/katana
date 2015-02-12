@@ -265,8 +265,9 @@ static void free_entity(entity_t *entities, u32 index)
         entities[index] = zero_entity;
 }
 
-static void update_entities(world_t *world, game_input_t *input)
+static void update_entities(game_state_t *game_state, game_input_t *input)
 {
+        world_t *world = &game_state->world;
         vec2f_t new_accels[KATANA_MAX_ENTITIES] = {};
 
         for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
@@ -283,10 +284,12 @@ static void update_entities(world_t *world, game_input_t *input)
                         }
 
                         // Throw teleporter
-                        if (controller->right_shoulder.ended_down && !entity->teleporter_index) {
-                                entity->teleporter_index = get_next_entity(world->entities);
-                                if (entity->teleporter_index != 0) {
-                                        entity_t *teleporter_entity = &world->entities[entity->teleporter_index];
+                        if (controller->right_shoulder.ended_down && entity->type == entity_type_player &&
+                            !entity->player.teleporter_index) {
+                                entity->player.teleporter_index = get_next_entity(world->entities);
+                                u32 teleporter_index = entity->player.teleporter_index;
+                                if (teleporter_index != 0) {
+                                        entity_t *teleporter_entity = &world->entities[teleporter_index];
                                         teleporter_entity->type = entity_type_teleporter;
                                         teleporter_entity->position = entity->position;
                                         teleporter_entity->velocity = entity->velocity;
@@ -294,6 +297,7 @@ static void update_entities(world_t *world, game_input_t *input)
                                         teleporter_entity->size.y = 2.0f;
                                         teleporter_entity->velocity_factor = -2.0f;
                                         teleporter_entity->acceleration_factor = 100.0f;
+                                        teleporter_entity->teleporter.image = &game_state->green_teleporter;
                                         vec2f_t left_stick;
                                         left_stick.x = controller->left_stick_x;
                                         left_stick.y = controller->left_stick_y;
@@ -305,12 +309,19 @@ static void update_entities(world_t *world, game_input_t *input)
                                 }
                         }
 
+                        // Attack
+                        if (controller->action_right.ended_down && entity->type == entity_type_player &&
+                            !entity->player.attacking) {
+                                entity->player.attacking = 1;
+                        }
+
                         // Teleport
-                        if (controller->left_shoulder.ended_down && entity->teleporter_index) {
-                                entity_t *teleporter_entity = &world->entities[entity->teleporter_index];
+                        if (controller->left_shoulder.ended_down && entity->type == entity_type_player &&
+                            entity->player.teleporter_index) {
+                                entity_t *teleporter_entity = &world->entities[entity->player.teleporter_index];
                                 entity->position = teleporter_entity->position;
-                                free_entity(world->entities, entity->teleporter_index);
-                                entity->teleporter_index = 0;
+                                free_entity(world->entities, entity->player.teleporter_index);
+                                entity->player.teleporter_index = 0;
                         }
 
                         // Move
@@ -486,6 +497,18 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                 game_state->player_images[3] = load_image("data/player/walk_with_sword/4.png", callbacks->map_file);
                 game_state->player_images[4] = load_image("data/player/walk_with_sword/5.png", callbacks->map_file);
                 game_state->player_images[5] = load_image("data/player/walk_with_sword/6.png", callbacks->map_file);
+                game_state->player_attack_images[0] =
+                    load_image("data/player/attack_with_sword/1.png", callbacks->map_file);
+                game_state->player_attack_images[1] =
+                    load_image("data/player/attack_with_sword/2.png", callbacks->map_file);
+                game_state->player_attack_images[2] =
+                    load_image("data/player/attack_with_sword/3.png", callbacks->map_file);
+                game_state->player_attack_images[3] =
+                    load_image("data/player/attack_with_sword/4.png", callbacks->map_file);
+                game_state->player_attack_images[4] =
+                    load_image("data/player/attack_with_sword/5.png", callbacks->map_file);
+                game_state->player_attack_images[5] =
+                    load_image("data/player/attack_with_sword/6.png", callbacks->map_file);
                 game_state->green_teleporter = load_image("data/teleporter/green.png", callbacks->map_file);
 
                 init_arena(&game_state->arena, memory->permanent_store_size - sizeof(game_state_t),
@@ -511,16 +534,16 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                         entity->exists = 1;
                         entity->velocity_factor = -7.0f; // Drag
                         entity->acceleration_factor = 150.0f;
-
-                        entity_anim_t *anim = &game_state->world.entity_anims[controlled_entity];
-                        anim->frames = game_state->player_images;
-                        anim->max_frames = 6;
-                        anim->fps = 24.0f;
-                        anim->exists = 1;
+                        entity->player.walk.frames = game_state->player_images;
+                        entity->player.walk.max_frames = 6;
+                        entity->player.walk.fps = 24.0f;
+                        entity->player.attack.frames = game_state->player_attack_images;
+                        entity->player.attack.max_frames = 6;
+                        entity->player.attack.fps = 24.0f;
                 }
         }
 
-        update_entities(&game_state->world, input);
+        update_entities(game_state, input);
 
         // Update draw offset and units_to_pixels so that camera always sees all players
         vec2f_t min_pos = {FLT_MAX, FLT_MAX};
@@ -619,33 +642,44 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                         continue;
                 }
 
-                entity_anim_t *anim = &game_state->world.entity_anims[controlled_entity];
-                image_t *entity_frame = 0;
-                if (anim->exists) {
-                        if (input->controllers[i].left_stick_x == 0.0f) {
-                                entity_frame = &anim->frames[anim->current_frame];
-                        } else {
-                                f32 anim_fps = katana_absf(input->controllers[i].left_stick_x) * anim->fps;
-                                if (anim->accumulator + input->delta_time >= (1.0f / anim_fps)) {
+                if (entity->type == entity_type_player) {
+                        entity_anim_t *anim;
+                        if (entity->player.attacking) {
+                                anim = &entity->player.attack;
+                                if (anim->accumulator + input->delta_time >= (1.0f / anim->fps)) {
                                         anim->current_frame = ++anim->current_frame % anim->max_frames;
                                         anim->accumulator = 0;
+                                        // TODO(Wes): This is not a good way to determine when attack is complete.
+                                        if (anim->current_frame == 0) {
+                                                entity->player.attacking = 0;
+                                        }
                                 } else {
                                         anim->accumulator += input->delta_time;
                                 }
-                                entity_frame = &anim->frames[anim->current_frame];
+                        } else {
+                                anim = &entity->player.walk;
+                                if (input->controllers[i].left_stick_x != 0.0f) {
+                                        f32 anim_fps = katana_absf(input->controllers[i].left_stick_x) * anim->fps;
+                                        if (anim->accumulator + input->delta_time >= (1.0f / anim_fps)) {
+                                                anim->current_frame = ++anim->current_frame % anim->max_frames;
+                                                anim->accumulator = 0;
+                                        } else {
+                                                anim->accumulator += input->delta_time;
+                                        }
+                                }
                         }
+                        vec2f_t draw_offset = {-0.3f, -0.4f};
+                        vec2f_t size = {8.0f, 5.0f};
+                        vec2f_t draw_pos = vec2f_add(entity->position, draw_offset);
+                        draw_image(draw_pos, size, game_state->world.draw_offset, &anim->frames[anim->current_frame],
+                                   frame_buffer, game_state->world.units_to_pixels, entity->velocity.x > 0);
                 }
 
-                vec2f_t draw_offset = {-0.3f, -0.4f};
-                vec2f_t size = {8.0f, 5.0f};
-                vec2f_t draw_pos = vec2f_add(entity->position, draw_offset);
-                draw_image(draw_pos, size, game_state->world.draw_offset, entity_frame, frame_buffer,
-                           game_state->world.units_to_pixels, entity->velocity.x > 0);
-
-                if (entity->teleporter_index) {
-                        entity_t *teleporter = &game_state->world.entities[entity->teleporter_index];
+                if (entity->type == entity_type_player && entity->player.teleporter_index) {
+                        entity_t *teleporter = &game_state->world.entities[entity->player.teleporter_index];
+                        assert(teleporter->type == entity_type_teleporter);
                         draw_image(teleporter->position, teleporter->size, game_state->world.draw_offset,
-                                   &game_state->green_teleporter, frame_buffer, game_state->world.units_to_pixels, 0);
+                                   teleporter->teleporter.image, frame_buffer, game_state->world.units_to_pixels, 0);
                 }
         }
 

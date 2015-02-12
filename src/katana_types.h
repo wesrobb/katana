@@ -55,10 +55,20 @@ typedef struct {
         u32 fps;
         f32 accumulator;
         image_t *frames;
-        b8 exists;
 } entity_anim_t;
 
 typedef enum { entity_type_player, entity_type_teleporter } entity_type_t;
+
+typedef struct {
+        entity_anim_t walk;
+        entity_anim_t attack;
+        u32 teleporter_index;
+        b8 attacking;
+} entity_player_t;
+
+typedef struct {
+        image_t *image;
+} entity_teleporter_t;
 
 typedef struct {
         vec2f_t position;
@@ -69,16 +79,19 @@ typedef struct {
         f32 velocity_factor;
         f32 acceleration_factor;
 
-        entity_type_t type;
-        u32 teleporter_index;
         b8 on_ground;
         b8 exists;
+
+        entity_type_t type;
+        union {
+                entity_player_t player;
+                entity_teleporter_t teleporter;
+        };
 } entity_t;
 
 #define KATANA_MAX_ENTITIES 512
 typedef struct {
         entity_t entities[KATANA_MAX_ENTITIES]; // Entity 0 is the "null" entity
-        entity_anim_t entity_anims[KATANA_MAX_ENTITIES];
         u32 controlled_entities[KATANA_MAX_CONTROLLERS];
         tilemap_t tilemap;
         vec2f_t draw_offset;
@@ -91,6 +104,7 @@ typedef struct {
         image_t background_image;
         image_t tile_image;
         image_t player_images[6];
+        image_t player_attack_images[6];
         image_t green_teleporter;
 
         memory_arena_t arena;
