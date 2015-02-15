@@ -7,6 +7,12 @@ vec2f_t vec2f(f32 x, f32 y)
         return dst;
 }
 
+vec2f_t vec2f_zero()
+{
+        vec2f_t dst = {0, 0};
+        return dst;
+}
+
 vec2f_t vec2f_add(vec2f_t a, vec2f_t b)
 {
         vec2f_t sum;

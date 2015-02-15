@@ -51,10 +51,15 @@ static inline void linear_blend(u32 src, u32 *dest)
         *dest = (u32)b << 16 | (u32)g << 8 | (u32)r;
 }
 
-static void draw_image(vec2f_t pos, vec2f_t size, vec2f_t draw_offset, image_t *image,
-                       game_frame_buffer_t *frame_buffer, f32 units_to_pixels, b8 flip_x)
+static void draw_image(vec2f_t pos, vec2f_t size, camera_t *camera, image_t *image, game_frame_buffer_t *frame_buffer,
+                       b8 flip_x)
 {
         assert(image);
+
+        f32 units_to_pixels = camera->units_to_pixels;
+        f32 frame_width_units = frame_buffer->width / units_to_pixels;
+        f32 frame_height_units = frame_buffer->height / units_to_pixels;
+        vec2f_t frame_buffer_half_size = {frame_width_units / 2.0f, frame_height_units / 2.0f};
 
         // Resizing ratio.
         vec2f_t actual_size;
@@ -69,6 +74,7 @@ static void draw_image(vec2f_t pos, vec2f_t size, vec2f_t draw_offset, image_t *
         vec2f_t bot_right_corner = vec2f_add(pos, half_size);
 
         // Add draw offsets.
+        vec2f_t draw_offset = vec2f_sub(camera->position, frame_buffer_half_size);
         top_left_corner = vec2f_sub(top_left_corner, draw_offset);
         bot_right_corner = vec2f_sub(bot_right_corner, draw_offset);
 
@@ -425,6 +431,12 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
                 } else {
                         entity->on_ground = 0;
                 }
+
+                if (entity->type == entity_type_player || entity->type == entity_type_teleporter) {
+                        game_state->world.camera_tracked_positions[i] = entity->position;
+                } else {
+                        game_state->world.camera_tracked_positions[i] = vec2f_zero();
+                }
         }
 }
 
@@ -450,9 +462,9 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
         assert(sizeof(game_state_t) <= memory->permanent_store_size);
         game_state_t *game_state = (game_state_t *)memory->permanent_store;
         if (!memory->is_initialized) {
-                game_state->world.units_to_pixels = 20.0f / 1.0f;
-                game_state->world.draw_offset.x = 10.0f;
-                game_state->world.draw_offset.y = 10.0f;
+                game_state->world.camera.units_to_pixels = 10.0f / 1.0f;
+                game_state->world.camera.position.x = 0.0f;
+                game_state->world.camera.position.y = 0.0f;
                 game_state->world.gravity.x = 0.0f;
                 game_state->world.gravity.y = 9.8f * 20;
                 game_state->t_sine = 0.0f;
@@ -544,53 +556,53 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
         }
 
         update_entities(game_state, input);
-
+#if 1
         // Update draw offset and units_to_pixels so that camera always sees all players
         vec2f_t min_pos = {FLT_MAX, FLT_MAX};
         vec2f_t max_pos = {FLT_MIN, FLT_MIN};
-        b8 entity_found = 0;
-        for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
-                u32 controlled_entity = game_state->world.controlled_entities[i];
-                if (controlled_entity != 0) {
-                        entity_t *entity = &game_state->world.entities[controlled_entity];
-                        if (entity->exists) {
-                                entity_found = 1;
-                                f32 x_pos = entity->position.x;
-                                f32 y_pos = entity->position.y;
-                                if (x_pos < min_pos.x) {
-                                        min_pos.x = x_pos;
-                                }
-                                if (y_pos < min_pos.y) {
-                                        min_pos.y = y_pos;
-                                }
-                                if (x_pos > max_pos.x) {
-                                        max_pos.x = x_pos;
-                                }
-                                if (y_pos > max_pos.y) {
-                                        max_pos.y = y_pos;
-                                }
+        b8 tracked_pos_found = 0;
+        for (u32 i = 0; i < KATANA_MAX_ENTITIES; ++i) {
+                vec2f_t tracked_pos = game_state->world.camera_tracked_positions[i];
+                if (tracked_pos.x != 0.0f && tracked_pos.y != 0.0f) {
+                        tracked_pos_found = 1;
+                        if (tracked_pos.x < min_pos.x) {
+                                min_pos.x = tracked_pos.x;
+                        }
+                        if (tracked_pos.y < min_pos.y) {
+                                min_pos.y = tracked_pos.y;
+                        }
+                        if (tracked_pos.x > max_pos.x) {
+                                max_pos.x = tracked_pos.x;
+                        }
+                        if (tracked_pos.y > max_pos.y) {
+                                max_pos.y = tracked_pos.y;
                         }
                 }
         }
-        if (!entity_found) {
-                min_pos.x = 10.0f;
-                min_pos.y = 10.0f;
+        if (!tracked_pos_found) {
+                min_pos.x = 30.0f;
+                min_pos.y = 30.0f;
         }
 
-        vec2f_t camera_edge_buffer = {32.0f, 32.0f};
+        vec2f_t camera_edge_buffer = {16.0f, 16.0f};
         min_pos = vec2f_sub(min_pos, camera_edge_buffer);
+        max_pos = vec2f_add(max_pos, camera_edge_buffer);
+        vec2f_t new_camera_pos = vec2f_div(vec2f_add(min_pos, max_pos), 2.0f);
 
-        game_state->world.draw_offset = vec2f_add(vec2f_mul(game_state->world.draw_offset, (1.0f - input->delta_time)),
-                                                  vec2f_mul(min_pos, input->delta_time));
+        f32 cam_speed = 4.0f;
+        game_state->world.camera.position =
+            vec2f_add(vec2f_mul(game_state->world.camera.position, (1.0f - (input->delta_time * cam_speed))),
+                      vec2f_mul(new_camera_pos, (input->delta_time * cam_speed)));
         vec2f_t screen_span = vec2f_sub(vec2f_add(max_pos, camera_edge_buffer), min_pos);
 
         f32 x_units_to_pixels = frame_buffer->width / screen_span.x;
         f32 y_units_to_pixels = frame_buffer->height / screen_span.y;
 
         f32 units_to_pixels = x_units_to_pixels < y_units_to_pixels ? x_units_to_pixels : y_units_to_pixels;
-        game_state->world.units_to_pixels =
-            (game_state->world.units_to_pixels * (1.0f - input->delta_time)) + (units_to_pixels * input->delta_time);
-
+        game_state->world.camera.units_to_pixels =
+            (game_state->world.camera.units_to_pixels * (1.0f - input->delta_time)) +
+            (units_to_pixels * input->delta_time);
+#endif
 #if 0
         // Clamp draw offset.
         if (game_state->world.draw_offset.x < 0.0f) {
@@ -611,8 +623,8 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
 
         vec2f_t background_pos = {64.0f, 36.0f};
         vec2f_t background_size = {128.0f, 72.0f};
-        draw_image(background_pos, background_size, game_state->world.draw_offset, &game_state->background_image,
-                   frame_buffer, game_state->world.units_to_pixels, 0);
+        draw_image(background_pos, background_size, &game_state->world.camera, &game_state->background_image,
+                   frame_buffer, 0);
 
         tilemap_t *tilemap = &game_state->world.tilemap;
         for (u32 i = 0; i < 18; ++i) {
@@ -623,8 +635,8 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                                 tile_origin.y = i * tilemap->tile_size.y;
                                 vec2f_t tile_half_size = vec2f_div(tilemap->tile_size, 2.0f);
                                 tile_origin = vec2f_add(tile_origin, tile_half_size);
-                                draw_image(tile_origin, tilemap->tile_size, game_state->world.draw_offset,
-                                           &game_state->tile_image, frame_buffer, game_state->world.units_to_pixels, 1);
+                                draw_image(tile_origin, tilemap->tile_size, &game_state->world.camera,
+                                           &game_state->tile_image, frame_buffer, 1);
                         }
                 }
         }
@@ -671,15 +683,15 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                         vec2f_t draw_offset = {-0.3f, -0.4f};
                         vec2f_t size = {8.0f, 5.0f};
                         vec2f_t draw_pos = vec2f_add(entity->position, draw_offset);
-                        draw_image(draw_pos, size, game_state->world.draw_offset, &anim->frames[anim->current_frame],
-                                   frame_buffer, game_state->world.units_to_pixels, entity->velocity.x > 0);
+                        draw_image(draw_pos, size, &game_state->world.camera, &anim->frames[anim->current_frame],
+                                   frame_buffer, entity->velocity.x > 0);
                 }
 
                 if (entity->type == entity_type_player && entity->player.teleporter_index) {
                         entity_t *teleporter = &game_state->world.entities[entity->player.teleporter_index];
                         assert(teleporter->type == entity_type_teleporter);
-                        draw_image(teleporter->position, teleporter->size, game_state->world.draw_offset,
-                                   teleporter->teleporter.image, frame_buffer, game_state->world.units_to_pixels, 0);
+                        draw_image(teleporter->position, teleporter->size, &game_state->world.camera,
+                                   teleporter->teleporter.image, frame_buffer, 0);
                 }
         }
 

@@ -89,14 +89,19 @@ typedef struct {
         };
 } entity_t;
 
+typedef struct {
+        vec2f_t position;
+        f32 units_to_pixels;
+} camera_t;
+
 #define KATANA_MAX_ENTITIES 512
 typedef struct {
-        entity_t entities[KATANA_MAX_ENTITIES]; // Entity 0 is the "null" entity
+        entity_t entities[KATANA_MAX_ENTITIES];                // Entity 0 is the "null" entity
+        vec2f_t camera_tracked_positions[KATANA_MAX_ENTITIES]; // Camera will always ensure these positions are in view.
         u32 controlled_entities[KATANA_MAX_CONTROLLERS];
         tilemap_t tilemap;
-        vec2f_t draw_offset;
+        camera_t camera;
         vec2f_t gravity; // units/sec^2
-        f32 units_to_pixels;
 } world_t;
 
 typedef struct {
