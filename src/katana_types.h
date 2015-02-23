@@ -57,9 +57,15 @@ typedef struct {
         image_t *frames;
 } entity_anim_t;
 
-typedef enum { entity_type_player, entity_type_teleporter } entity_type_t;
+typedef enum {
+        entity_type_player,
+        entity_type_teleporter,
+} entity_type_t;
 
+#define KATANA_MAX_HIT_ENTITIES 4
 typedef struct {
+        vec2f_t katana_offset; // Offset from the players position depending on which way the players is facing.
+        u32 hit_entities[KATANA_MAX_HIT_ENTITIES];
         entity_anim_t walk;
         entity_anim_t attack;
         u32 teleporter_index;

@@ -131,15 +131,20 @@ static void draw_image(vec2f_t pos, vec2f_t size, camera_t *camera, image_t *ima
         }
 }
 
-static void draw_block(vec2f_t pos, vec2f_t size, vec2f_t draw_offset, game_frame_buffer_t *frame_buffer, u32 color,
-                       f32 units_to_pixels)
+static void draw_block(vec2f_t pos, vec2f_t size, camera_t *camera, game_frame_buffer_t *frame_buffer, u32 color)
 {
+        f32 units_to_pixels = camera->units_to_pixels;
+        f32 frame_width_units = frame_buffer->width / units_to_pixels;
+        f32 frame_height_units = frame_buffer->height / units_to_pixels;
+        vec2f_t frame_buffer_half_size = {frame_width_units / 2.0f, frame_height_units / 2.0f};
+
         // Calculate top left and bottom right of block.
         vec2f_t half_size = vec2f_div(size, 2.0f);
         vec2f_t top_left_corner = vec2f_sub(pos, half_size);
         vec2f_t bot_right_corner = vec2f_add(pos, half_size);
 
         // Add draw offsets.
+        vec2f_t draw_offset = vec2f_sub(camera->position, frame_buffer_half_size);
         top_left_corner = vec2f_sub(top_left_corner, draw_offset);
         bot_right_corner = vec2f_sub(bot_right_corner, draw_offset);
 
@@ -171,10 +176,10 @@ static void draw_block(vec2f_t pos, vec2f_t size, vec2f_t draw_offset, game_fram
         } else if (bot_right_pixel.y > (i32)frame_buffer->height) {
                 bot_right_pixel.y = frame_buffer->height;
         }
-
         for (i32 i = top_left_pixel.y; i < bot_right_pixel.y; ++i) {
                 for (i32 j = top_left_pixel.x; j < bot_right_pixel.x; ++j) {
-                        frame_buffer->pixels[j + i * frame_buffer->width] = color;
+                        u32 *dest = &frame_buffer->pixels[j + i * frame_buffer->width];
+                        *dest = color;
                 }
         }
 }
@@ -432,10 +437,47 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
                         entity->on_ground = 0;
                 }
 
+                // Track entity positions for the camera
                 if (entity->type == entity_type_player || entity->type == entity_type_teleporter) {
                         game_state->world.camera_tracked_positions[i] = entity->position;
-                } else {
-                        game_state->world.camera_tracked_positions[i] = vec2f_zero();
+                }
+
+                // If this entity is a sword then check if it is currently intersecting with any players
+                if (entity->type == entity_type_player && entity->player.attacking) {
+                        for (u32 j = 1; j < KATANA_MAX_ENTITIES; ++j) {
+                                entity_t *other_player = &world->entities[j];
+                                if (i == j || !other_player->exists || other_player->type != entity_type_player) {
+                                        continue;
+                                }
+                                vec2f_t katana_pos;
+                                if (entity->velocity.x > 0) {
+                                        katana_pos = vec2f_add(entity->position, entity->player.katana_offset);
+                                } else {
+                                        katana_pos = vec2f_sub(entity->position, entity->player.katana_offset);
+                                }
+                                vec2f_t player_pos = other_player->position;
+                                vec2f_t player_half_size = vec2f_div(other_player->size, 2.0f);
+                                if (player_pos.x - player_half_size.x < katana_pos.x &&
+                                    player_pos.x + player_half_size.x > katana_pos.x &&
+                                    player_pos.y - player_half_size.y < katana_pos.y &&
+                                    player_pos.y + player_half_size.y > katana_pos.y) {
+                                        for (u32 k = 0; k < KATANA_MAX_CONTROLLERS; ++k) {
+                                                if (world->controlled_entities[k] == j) {
+                                                        world->controlled_entities[k] = 0;
+                                                }
+                                        }
+
+                                        other_player->exists = 0;
+                                        if (other_player->player.teleporter_index) {
+                                                entity_t *other_teleporter =
+                                                    &world->entities[other_player->player.teleporter_index];
+                                                if (other_teleporter->exists) {
+                                                        other_teleporter->exists = 0;
+                                                        other_teleporter->player.teleporter_index = 0;
+                                                }
+                                        }
+                                }
+                        }
                 }
         }
 }
@@ -552,11 +594,12 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                         entity->player.attack.frames = game_state->player_attack_images;
                         entity->player.attack.max_frames = 6;
                         entity->player.attack.fps = 24.0f;
+                        entity->player.katana_offset.x = 3.0f;
                 }
         }
 
         update_entities(game_state, input);
-#if 1
+
         // Update draw offset and units_to_pixels so that camera always sees all players
         vec2f_t min_pos = {FLT_MAX, FLT_MAX};
         vec2f_t max_pos = {FLT_MIN, FLT_MIN};
@@ -579,44 +622,46 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                         }
                 }
         }
+        memset(game_state->world.camera_tracked_positions, 0, KATANA_MAX_ENTITIES * sizeof(vec2f_t));
         if (!tracked_pos_found) {
                 min_pos.x = 30.0f;
                 min_pos.y = 30.0f;
         }
 
-        vec2f_t camera_edge_buffer = {16.0f, 16.0f};
+        vec2f_t camera_edge_buffer = {8.0f, 8.0f};
         min_pos = vec2f_sub(min_pos, camera_edge_buffer);
         max_pos = vec2f_add(max_pos, camera_edge_buffer);
         vec2f_t new_camera_pos = vec2f_div(vec2f_add(min_pos, max_pos), 2.0f);
 
-        f32 cam_speed = 4.0f;
+        f32 cam_move_speed = 4.0f;
         game_state->world.camera.position =
-            vec2f_add(vec2f_mul(game_state->world.camera.position, (1.0f - (input->delta_time * cam_speed))),
-                      vec2f_mul(new_camera_pos, (input->delta_time * cam_speed)));
-        vec2f_t screen_span = vec2f_sub(vec2f_add(max_pos, camera_edge_buffer), min_pos);
+            vec2f_add(vec2f_mul(game_state->world.camera.position, (1.0f - (input->delta_time * cam_move_speed))),
+                      vec2f_mul(new_camera_pos, (input->delta_time * cam_move_speed)));
 
+        vec2f_t screen_span = vec2f_sub(vec2f_add(max_pos, camera_edge_buffer), min_pos);
         f32 x_units_to_pixels = frame_buffer->width / screen_span.x;
         f32 y_units_to_pixels = frame_buffer->height / screen_span.y;
 
         f32 units_to_pixels = x_units_to_pixels < y_units_to_pixels ? x_units_to_pixels : y_units_to_pixels;
+        f32 cam_zoom_speed = 2.0f;
         game_state->world.camera.units_to_pixels =
-            (game_state->world.camera.units_to_pixels * (1.0f - input->delta_time)) +
-            (units_to_pixels * input->delta_time);
-#endif
+            (game_state->world.camera.units_to_pixels * (1.0f - (input->delta_time * cam_zoom_speed))) +
+            (units_to_pixels * (input->delta_time * cam_zoom_speed));
+
 #if 0
         // Clamp draw offset.
-        if (game_state->world.draw_offset.x < 0.0f) {
-                game_state->world.draw_offset.x = 0.0;
-        } else if (game_state->world.draw_offset.x + frame_buffer->width / units_to_pixels >=
+        if (game_state->world.camera.position.x < 0.0f) {
+                game_state->world.camera.position.x = 0.0;
+        } else if (game_state->world.camera.position.x + frame_buffer->width / units_to_pixels >=
                    32 * game_state->world.tilemap.tile_size.x) {
-                game_state->world.draw_offset.x =
+                game_state->world.camera.position.x =
                     (32 * game_state->world.tilemap.tile_size.x) - frame_buffer->width / units_to_pixels;
         }
-        if (game_state->world.draw_offset.y < 0.0f) {
-                game_state->world.draw_offset.y = 0.0;
-        } else if (game_state->world.draw_offset.y + frame_buffer->height / units_to_pixels >=
+        if (game_state->world.camera.position.y < 0.0f) {
+                game_state->world.camera.position.y = 0.0;
+        } else if (game_state->world.camera.position.y + frame_buffer->height / units_to_pixels >=
                    18 * game_state->world.tilemap.tile_size.y) {
-                game_state->world.draw_offset.y =
+                game_state->world.camera.position.y =
                     (18 * game_state->world.tilemap.tile_size.y) - frame_buffer->height / units_to_pixels;
         }
 #endif
@@ -640,9 +685,6 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                         }
                 }
         }
-
-        // draw_block(player->position, player->size, game_state->world.draw_offset, frame_buffer, 0xFFFFFFFF,
-        //          units_to_pixels);
 
         for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
                 u32 controlled_entity = game_state->world.controlled_entities[i];
@@ -685,6 +727,18 @@ void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_bu
                         vec2f_t draw_pos = vec2f_add(entity->position, draw_offset);
                         draw_image(draw_pos, size, &game_state->world.camera, &anim->frames[anim->current_frame],
                                    frame_buffer, entity->velocity.x > 0);
+
+                        // Debug drawing for katana point.
+                        if (entity->player.attacking) {
+                                vec2f_t katana_pos;
+                                if (entity->velocity.x > 0) {
+                                        katana_pos = vec2f_add(entity->position, entity->player.katana_offset);
+                                } else {
+                                        katana_pos = vec2f_sub(entity->position, entity->player.katana_offset);
+                                }
+                                vec2f_t size = {1.0f, 1.0f};
+                                draw_block(katana_pos, size, &game_state->world.camera, frame_buffer, 0xFFFFFFFF);
+                        }
                 }
 
                 if (entity->type == entity_type_player && entity->player.teleporter_index) {
