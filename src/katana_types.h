@@ -26,7 +26,8 @@ void init_arena(memory_arena_t *arena, u32 size, u8 *base)
 }
 
 #define push_struct(arena, type) (type *) push_size_(arena, sizeof(type))
-#define push_array(arena, count, type) (type *) push_size_(arena, (count) * sizeof(type))
+#define push_array(arena, count, type)                                         \
+        (type *) push_size_(arena, (count) * sizeof(type))
 void *push_size_(memory_arena_t *arena, u32 size)
 {
         assert((arena->index + size) <= arena->size);
@@ -64,7 +65,8 @@ typedef enum {
 
 #define KATANA_MAX_HIT_ENTITIES 4
 typedef struct {
-        vec2f_t katana_offset; // Offset from the players position depending on which way the players is facing.
+        vec2f_t katana_offset; // Offset from the players position depending on
+                               // which way the players is facing.
         u32 hit_entities[KATANA_MAX_HIT_ENTITIES];
         entity_anim_t walk;
         entity_anim_t attack;
@@ -102,8 +104,12 @@ typedef struct {
 
 #define KATANA_MAX_ENTITIES 512
 typedef struct {
-        entity_t entities[KATANA_MAX_ENTITIES];                // Entity 0 is the "null" entity
-        vec2f_t camera_tracked_positions[KATANA_MAX_ENTITIES]; // Camera will always ensure these positions are in view.
+        entity_t entities[KATANA_MAX_ENTITIES]; // Entity 0 is the "null" entity
+        vec2f_t camera_tracked_positions[KATANA_MAX_ENTITIES]; // Camera will
+                                                               // always ensure
+                                                               // these
+                                                               // positions are
+                                                               // in view.
         u32 controlled_entities[KATANA_MAX_CONTROLLERS];
         tilemap_t tilemap;
         camera_t camera;

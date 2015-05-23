@@ -5,16 +5,17 @@
 #define KATANA_TARGET_FPS 60
 
 #if KATANA_DEBUG
-#define assert(Expression)                                                                                             \
-        if (!(Expression)) {                                                                                           \
-                *(volatile int *)0 = 0;                                                                                \
+#define assert(Expression)                                                     \
+        if (!(Expression)) {                                                   \
+                *(volatile int *)0 = 0;                                        \
         }
 #else
 #define assert(Expression)
 #endif
 
 #define set_alignment(BYTE_COUNT) __attribute__((__aligned__(BYTE_COUNT)))
-#define is_aligned(POINTER, BYTE_COUNT) (((uintptr_t)(const void *)(POINTER)) % (BYTE_COUNT) == 0)
+#define is_aligned(POINTER, BYTE_COUNT)                                        \
+        (((uintptr_t)(const void *)(POINTER)) % (BYTE_COUNT) == 0)
 
 #define min(a, b) a < b ? a : b
 #define max(a, b) a > b ? a : b
@@ -127,5 +128,7 @@ typedef struct {
         unmap_file_fn unmap_file;
 } game_callbacks_t;
 
-void game_update_and_render(game_memory_t *memory, game_frame_buffer_t *frame_buffer, game_audio_t *audio,
-                            game_input_t *input, game_output_t *output, game_callbacks_t *callbacks);
+void game_update_and_render(game_memory_t *memory,
+                            game_frame_buffer_t *frame_buffer,
+                            game_audio_t *audio, game_input_t *input,
+                            game_output_t *output, game_callbacks_t *callbacks);
