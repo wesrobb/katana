@@ -5,12 +5,37 @@
 typedef struct {
         i32 x;
         i32 y;
-} vec2i_t;
+} v2i;
 
 typedef struct {
         f32 x;
         f32 y;
-} vec2f_t;
+} v2;
+
+typedef struct {
+        f32 x;
+        f32 y;
+        f32 z;
+} v3;
+
+typedef struct {
+        union {
+                f32 x;
+                f32 r;
+        };
+        union {
+                f32 y;
+                f32 g;
+        };
+        union {
+                f32 z;
+                f32 b;
+        };
+        union {
+                f32 w;
+                f32 a;
+        };
+} v4;
 
 typedef struct {
         u32 size;
@@ -45,7 +70,7 @@ typedef struct {
 
 typedef struct {
         unsigned char tiles[18 * 32];
-        vec2f_t tile_size;
+        v2 tile_size;
         u16 tiles_wide;
         u16 tiles_high;
 } tilemap_t;
@@ -65,8 +90,8 @@ typedef enum {
 
 #define KATANA_MAX_HIT_ENTITIES 4
 typedef struct {
-        vec2f_t katana_offset; // Offset from the players position depending on
-                               // which way the players is facing.
+        v2 katana_offset; // Offset from the players position depending on
+                          // which way the players is facing.
         u32 hit_entities[KATANA_MAX_HIT_ENTITIES];
         entity_anim_t walk;
         entity_anim_t attack;
@@ -79,10 +104,10 @@ typedef struct {
 } entity_teleporter_t;
 
 typedef struct {
-        vec2f_t position;
-        vec2f_t size;
-        vec2f_t velocity;
-        vec2f_t acceleration;
+        v2 position;
+        v2 size;
+        v2 velocity;
+        v2 acceleration;
 
         f32 velocity_factor;
         f32 acceleration_factor;
@@ -98,22 +123,22 @@ typedef struct {
 } entity_t;
 
 typedef struct {
-        vec2f_t position;
+        v2 position;
         f32 units_to_pixels;
 } camera_t;
 
 #define KATANA_MAX_ENTITIES 512
 typedef struct {
         entity_t entities[KATANA_MAX_ENTITIES]; // Entity 0 is the "null" entity
-        vec2f_t camera_tracked_positions[KATANA_MAX_ENTITIES]; // Camera will
-                                                               // always ensure
-                                                               // these
-                                                               // positions are
-                                                               // in view.
+        v2 camera_tracked_positions[KATANA_MAX_ENTITIES]; // Camera will
+                                                          // always ensure
+                                                          // these
+                                                          // positions are
+                                                          // in view.
         u32 controlled_entities[KATANA_MAX_CONTROLLERS];
         tilemap_t tilemap;
         camera_t camera;
-        vec2f_t gravity; // units/sec^2
+        v2 gravity; // units/sec^2
 } world_t;
 
 typedef struct {

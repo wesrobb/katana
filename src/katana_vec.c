@@ -1,56 +1,50 @@
 #include "katana_types.h"
 #include "katana_intrinsics.h"
 
-vec2f_t vec2f(f32 x, f32 y)
+v2 v2_zero()
 {
-        vec2f_t dst = {x, y};
+        v2 dst = {0, 0};
         return dst;
 }
 
-vec2f_t vec2f_zero()
+v2 v2_add(v2 a, v2 b)
 {
-        vec2f_t dst = {0, 0};
-        return dst;
-}
-
-vec2f_t vec2f_add(vec2f_t a, vec2f_t b)
-{
-        vec2f_t sum;
+        v2 sum;
         sum.x = a.x + b.x;
         sum.y = a.y + b.y;
         return sum;
 }
 
-vec2f_t vec2f_sub(vec2f_t a, vec2f_t b)
+v2 v2_sub(v2 a, v2 b)
 {
-        vec2f_t diff;
+        v2 diff;
         diff.x = a.x - b.x;
         diff.y = a.y - b.y;
         return diff;
 }
 
-vec2f_t vec2f_mul(vec2f_t a, f32 scalar)
+v2 v2_mul(v2 a, f32 scalar)
 {
-        vec2f_t product;
+        v2 product;
         product.x = a.x * scalar;
         product.y = a.y * scalar;
         return product;
 }
 
-vec2f_t vec2f_div(vec2f_t a, f32 scalar)
+v2 v2_div(v2 a, f32 scalar)
 {
-        vec2f_t quotient;
+        v2 quotient;
         quotient.x = a.x / scalar;
         quotient.y = a.y / scalar;
         return quotient;
 }
 
-f32 vec2f_dot(vec2f_t a, vec2f_t b)
+f32 v2_dot(v2 a, v2 b)
 {
         return a.x * b.x + a.y + b.y;
 }
 
-void vec2f_round2(vec2f_t a, vec2f_t b, vec2i_t *a_result, vec2i_t *b_result)
+void v2_round2(v2 a, v2 b, v2i *a_result, v2i *b_result)
 {
         assert(a_result);
         assert(b_result);
@@ -71,7 +65,7 @@ void vec2f_round2(vec2f_t a, vec2f_t b, vec2i_t *a_result, vec2i_t *b_result)
         b_result->y = (i32)results[3];
 }
 
-void vec2f_floor2(vec2f_t a, vec2f_t b, vec2i_t *a_result, vec2i_t *b_result)
+void v2_floor2(v2 a, v2 b, v2i *a_result, v2i *b_result)
 {
         assert(a_result);
         assert(b_result);
@@ -92,7 +86,7 @@ void vec2f_floor2(vec2f_t a, vec2f_t b, vec2i_t *a_result, vec2i_t *b_result)
         b_result->y = (i32)results[3];
 }
 
-void vec2f_ceil2(vec2f_t a, vec2f_t b, vec2i_t *a_result, vec2i_t *b_result)
+void v2_ceil2(v2 a, v2 b, v2i *a_result, v2i *b_result)
 {
         assert(a_result);
         assert(b_result);
@@ -114,9 +108,9 @@ void vec2f_ceil2(vec2f_t a, vec2f_t b, vec2i_t *a_result, vec2i_t *b_result)
 }
 
 // Converts the specified vector into 1 on each axis preserving the sign.
-vec2i_t vec2f_sign(vec2f_t src)
+v2i v2_sign(v2 src)
 {
-        vec2i_t result = {};
+        v2i result = {};
         if (src.x > 0.0f) {
                 result.x = 1;
         } else if (src.x < 0.0f) {
@@ -130,7 +124,7 @@ vec2i_t vec2f_sign(vec2f_t src)
         return result;
 }
 
-vec2f_t vec2f_lerp(vec2f_t v0, vec2f_t v1, f32 t)
+v2 v2_lerp(v2 v0, v2 v1, f32 t)
 {
-        return vec2f_add(vec2f_mul(v1, t), vec2f_mul(v0, 1.0f - t));
+        return v2_add(v2_mul(v1, t), v2_mul(v0, 1.0f - t));
 }
