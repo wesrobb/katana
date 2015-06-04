@@ -2,6 +2,7 @@
 
 #include "katana_platform.h"
 
+// Note(Wes): Vectors
 typedef struct {
         i32 x;
         i32 y;
@@ -37,6 +38,7 @@ typedef struct {
         };
 } v4;
 
+// Note(Wes): Memory
 typedef struct {
         u32 size;
         u32 index;
@@ -50,10 +52,9 @@ void init_arena(memory_arena_t *arena, u32 size, u8 *base)
         arena->index = 0;
 }
 
-#define push_struct(arena, type) (type *) push_size_(arena, sizeof(type))
-#define push_array(arena, count, type)                                         \
-        (type *) push_size_(arena, (count) * sizeof(type))
-void *push_size_(memory_arena_t *arena, u32 size)
+#define push_struct(arena, type) (type *) push_size(arena, sizeof(type))
+#define push_array(arena, count, type) (type *) push_size(arena, (count) * sizeof(type))
+void *push_size(memory_arena_t *arena, u32 size)
 {
         assert((arena->index + size) <= arena->size);
         void *result = arena->base + arena->index;
@@ -75,6 +76,7 @@ typedef struct {
         u16 tiles_high;
 } tilemap_t;
 
+// Note(Wes): Entities
 typedef struct {
         u32 max_frames;
         u32 current_frame;
@@ -122,14 +124,46 @@ typedef struct {
         };
 } entity_t;
 
+// Note(Wes): Renderer
 typedef struct {
         v2 position;
         f32 units_to_pixels;
 } camera_t;
 
+typedef enum { render_type_clear, render_type_block, render_type_image } render_type_t;
+
+typedef struct {
+        render_type_t type;
+        v4 color;
+} render_cmd_clear_t;
+
+typedef struct {
+        render_type_t type;
+        v2 pos;
+        v2 size;
+        v4 color;
+} render_cmd_block_t;
+
+typedef struct {
+        render_type_t type;
+        v2 pos;
+        v2 size;
+        image_t *image;
+        b8 flip_x;
+} render_cmd_image_t;
+
+typedef struct {
+        camera_t *camera;
+
+        u32 size;
+        u32 index;
+        u8 *base;
+} render_queue_t;
+
+// Note(Wes): Game
 #define KATANA_MAX_ENTITIES 512
 typedef struct {
-        entity_t entities[KATANA_MAX_ENTITIES]; // Entity 0 is the "null" entity
+        entity_t entities[KATANA_MAX_ENTITIES];           // Entity 0 is the "null" entity
         v2 camera_tracked_positions[KATANA_MAX_ENTITIES]; // Camera will
                                                           // always ensure
                                                           // these
@@ -150,6 +184,9 @@ typedef struct {
         image_t green_teleporter;
 
         memory_arena_t arena;
+        memory_arena_t frame_arena;
+
+        render_queue_t *render_queue;
 
         f32 t_sine;
         i32 tone_hz;

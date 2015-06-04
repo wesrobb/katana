@@ -469,15 +469,6 @@ int main(void)
                 i32 texture_pitch = 0;
                 SDL_LockTexture(texture, 0, (void **)&frame_buffer.pixels, &texture_pitch);
 
-                // NOTE(Wes): Clear the framebuffer.
-                u32 *pixel = frame_buffer.pixels;
-                for (u32 y = 0; y < frame_buffer.height; ++y) {
-                        for (u32 x = 0; x < frame_buffer.width; ++x) {
-                                *pixel = 0x00FF0000;
-                                pixel++;
-                        }
-                }
-
                 game.update_and_render_fn(&game_memory, &frame_buffer, &audio, new_input, &output, &callbacks);
                 SDL_UnlockTexture(texture);
 

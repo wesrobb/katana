@@ -128,3 +128,13 @@ v2 v2_lerp(v2 v0, v2 v1, f32 t)
 {
         return v2_add(v2_mul(v1, t), v2_mul(v0, 1.0f - t));
 }
+
+v4 color(f32 r, f32 g, f32 b, f32 a)
+{
+        v4 result;
+        result.r = r;
+        result.g = g;
+        result.b = b;
+        result.a = a;
+        return result;
+}
