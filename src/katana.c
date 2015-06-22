@@ -534,6 +534,7 @@ void game_update_and_render(game_memory_t *memory,
 
     // Update draw offset and units_to_pixels so that camera always sees all
     // players
+
     v2 min_pos = V2(FLT_MAX, FLT_MAX);
     v2 max_pos = V2(FLT_MIN, FLT_MIN);
     b8 tracked_pos_found = 0;
@@ -555,14 +556,17 @@ void game_update_and_render(game_memory_t *memory,
             }
         }
     }
+    // TODO(Wes): Override camera tracking and just watch the whole tilemap...
+    // for now.
+    // This should be removed sometime.
+    min_pos = V2(0, 0);
+    tilemap_t *tilemap = &game_state->world.tilemap;
+    max_pos = V2(tilemap->tile_size.x * tilemap->tiles_wide,
+                 tilemap->tile_size.y * tilemap->tiles_high);
     memset(game_state->world.camera_tracked_positions, 0,
            KATANA_MAX_ENTITIES * sizeof(v2));
-    if (!tracked_pos_found) {
-        min_pos.x = 30.0f;
-        min_pos.y = 30.0f;
-    }
 
-    v2 camera_edge_buffer = V2(8.0f, 8.0f);
+    v2 camera_edge_buffer = V2(0.0f, 0.0f);
     min_pos = v2_sub(min_pos, camera_edge_buffer);
     max_pos = v2_add(max_pos, camera_edge_buffer);
     v2 new_camera_pos = v2_div(v2_add(min_pos, max_pos), 2.0f);
@@ -570,7 +574,7 @@ void game_update_and_render(game_memory_t *memory,
     f32 cam_move_speed = 4.0f;
     game_state->world.camera.position =
         v2_add(v2_mul(game_state->world.camera.position,
-(1.0f - (input->delta_time * cam_move_speed))),
+                      (1.0f - (input->delta_time * cam_move_speed))),
                v2_mul(new_camera_pos, (input->delta_time * cam_move_speed)));
 
     v2 screen_span = v2_sub(v2_add(max_pos, camera_edge_buffer), min_pos);
@@ -580,6 +584,8 @@ void game_update_and_render(game_memory_t *memory,
     f32 units_to_pixels = x_units_to_pixels < y_units_to_pixels
                               ? x_units_to_pixels
                               : y_units_to_pixels;
+    game_state->world.camera.units_to_pixels = units_to_pixels;
+
     f32 cam_zoom_speed = 2.0f;
     game_state->world.camera.units_to_pixels =
         (game_state->world.camera.units_to_pixels *
@@ -587,37 +593,37 @@ void game_update_and_render(game_memory_t *memory,
         (units_to_pixels * (input->delta_time * cam_zoom_speed));
 
 #if 0
-        // Clamp draw offset.
-        if (game_state->world.camera.position.x < 0.0f) {
-                game_state->world.camera.position.x = 0.0;
-        } else if (game_state->world.camera.position.x + frame_buffer->width / units_to_pixels >=
-                   32 * game_state->world.tilemap.tile_size.x) {
-                game_state->world.camera.position.x =
-                    (32 * game_state->world.tilemap.tile_size.x) - frame_buffer->width / units_to_pixels;
-        }
-        if (game_state->world.camera.position.y < 0.0f) {
-                game_state->world.camera.position.y = 0.0;
-        } else if (game_state->world.camera.position.y + frame_buffer->height / units_to_pixels >=
-                   18 * game_state->world.tilemap.tile_size.y) {
-                game_state->world.camera.position.y =
-                    (18 * game_state->world.tilemap.tile_size.y) - frame_buffer->height / units_to_pixels;
-        }
+    // Clamp draw offset.
+    f32 units_to_pixels = x_units_to_pixels < y_units_to_pixels
+                              ? x_units_to_pixels
+                              : y_units_to_pixels;
+    if (game_state->world.camera.position.x < 0.0f) {
+        game_state->world.camera.position.x = 0.0;
+    } else if (game_state->world.camera.position.x +
+                   frame_buffer->width / units_to_pixels >=
+               32 * game_state->world.tilemap.tile_size.x) {
+        game_state->world.camera.position.x =
+            (32 * game_state->world.tilemap.tile_size.x) -
+            frame_buffer->width / units_to_pixels;
+    }
+    if (game_state->world.camera.position.y < 0.0f) {
+        game_state->world.camera.position.y = 0.0;
+    } else if (game_state->world.camera.position.y +
+                   frame_buffer->height / units_to_pixels >=
+               18 * game_state->world.tilemap.tile_size.y) {
+        game_state->world.camera.position.y =
+            (18 * game_state->world.tilemap.tile_size.y) -
+            frame_buffer->height / units_to_pixels;
+    }
 #endif
     // NOTE(Wes): Start by clearing the screen.
-    render_push_clear(game_state->render_queue, color(1.0f, 1.0f, 1.0f, 1.0f));
-
-    render_basis_t basis = {
-        V2(frame_buffer->width / 2.0f, frame_buffer->height / 2.0f), V2(1, 0),
-        V2(0, 1)};
-    render_push_rotated_block(game_state->render_queue, &basis,
-                              V2(5, 5), COLOR(1, 0, 1, 1));
+    render_push_clear(game_state->render_queue, COLOR(1.0f, 1.0f, 1.0f, 1.0f));
 
     v2 background_pos = V2(64.0f, 36.0f);
     v2 background_size = V2(128.0f, 72.0f);
     render_push_image(game_state->render_queue, background_pos, background_size,
                       &game_state->background_image, 0);
 
-    tilemap_t *tilemap = &game_state->world.tilemap;
     for (u32 i = 0; i < 18; ++i) {
         for (u32 j = 0; j < 32; ++j) {
             if (tilemap->tiles[j + i * tilemap->tiles_wide]) {
@@ -695,7 +701,7 @@ void game_update_and_render(game_memory_t *memory,
                 }
                 v2 size = V2(1.0f, 1.0f);
                 render_push_block(game_state->render_queue, katana_pos, size,
-                                  color(1.0f, 1.0f, 1.0f, 1.0f));
+                                  COLOR(1.0f, 1.0f, 1.0f, 1.0f));
             }
         }
 
@@ -709,6 +715,10 @@ void game_update_and_render(game_memory_t *memory,
                               0);
         }
     }
+
+    render_basis_t basis = {V2(30.0f, 30.0f), V2(10, 0), V2(0, 10)};
+    render_push_rotated_block(game_state->render_queue, &basis, V2(2, 2),
+                              COLOR(1, 0, 1, 1));
 
     render_draw_queue(game_state->render_queue, frame_buffer);
 

@@ -97,20 +97,19 @@ static void render_block(v2 pos, v2 size, v4 color, camera_t *cam,
     }
 }
 
-static void render_rotated_block(render_cmd_block_t *cmd, camera_t* cam, 
+static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam,
                                  game_frame_buffer_t *frame_buffer)
 {
     render_basis_t basis = cmd->header.basis;
-    v2 size = V2(5, 5);
-    v4 color = COLOR(1, 1, 0, 1);
+    v2 size = V2(2, 2);
+    v4 color = COLOR(1, 0, 1, 1);
     render_block(basis.origin, size, color, cam, frame_buffer);
-    render_block(v2_add(basis.origin, basis.x_axis),
-                 size, color, cam, frame_buffer);
-    render_block(v2_add(basis.origin, basis.y_axis),
-                 size, color, cam, frame_buffer);
+    render_block(v2_add(basis.origin, basis.x_axis), size, color, cam,
+                 frame_buffer);
+    render_block(v2_add(basis.origin, basis.y_axis), size, color, cam,
+                 frame_buffer);
     for (u32 y = 0; y < frame_buffer->height; y++) {
         for (u32 x = 0; x < frame_buffer->width; x++) {
-
         }
     }
 }
@@ -227,12 +226,12 @@ void render_push_block(render_queue_t *queue, v2 pos, v2 size, v4 color)
     cmd->color = color;
 }
 
-void render_push_rotated_block(render_queue_t *queue, render_basis_t* basis,
-                               v2 size,  v4 color)
+void render_push_rotated_block(render_queue_t *queue, render_basis_t *basis,
+                               v2 size, v4 color)
 {
     render_cmd_block_t *cmd = (render_cmd_block_t *)render_push_cmd(
         queue, sizeof(render_cmd_block_t));
-    cmd->header.type = render_type_block;
+    cmd->header.type = render_type_rotated_block;
     cmd->header.basis = *basis;
     cmd->size = size;
     cmd->color = color;
@@ -261,24 +260,23 @@ render_queue_t *render_alloc_queue(memory_arena_t *arena,
     return queue;
 }
 
+#include <stdio.h>
 void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer)
 {
     for (u32 address = 0; address < queue->index;) {
-        render_cmd_header_t *header = (render_cmd_header_t *)(queue->base +
-                                                              address);
+        render_cmd_header_t *header =
+            (render_cmd_header_t *)(queue->base + address);
         switch (header->type) {
         case render_type_clear:
             render_clear((render_cmd_clear_t *)header, frame_buffer);
             address += sizeof(render_cmd_clear_t);
             break;
-        case render_type_block:
-            {
-            render_cmd_block_t* cmd = (render_cmd_block_t *)header; 
+        case render_type_block: {
+            render_cmd_block_t *cmd = (render_cmd_block_t *)header;
             render_block(cmd->pos, cmd->size, cmd->color, queue->camera,
                          frame_buffer);
             address += sizeof(render_cmd_block_t);
-            }
-            break;
+        } break;
         case render_type_rotated_block:
             render_rotated_block((render_cmd_block_t *)header, queue->camera,
                                  frame_buffer);
