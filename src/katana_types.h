@@ -4,190 +4,203 @@
 
 // Note(Wes): Vectors
 typedef struct {
-        i32 x;
-        i32 y;
+    i32 x;
+    i32 y;
 } v2i;
 
-typedef struct {
-        f32 x;
-        f32 y;
+typedef union {
+    struct { f32 x, y; };
+    f32 v[2];
 } v2;
+#define V2(x, y) (v2){{x, y}}
 
-typedef struct {
-        f32 x;
-        f32 y;
-        f32 z;
+typedef union {
+    struct { f32 x, y, z; };
+    struct { v2 xy; };
+    struct { f32 x_; v2 yz; };
+    f32 v[3];
 } v3;
+#define V3(x, y, z) (v3){{x, y, z}}
 
-typedef struct {
-        union {
-                f32 x;
-                f32 r;
-        };
-        union {
-                f32 y;
-                f32 g;
-        };
-        union {
-                f32 z;
-                f32 b;
-        };
-        union {
-                f32 w;
-                f32 a;
-        };
+typedef union {
+    struct { f32 x, y, z, w; };
+    struct { f32 r, g, b, a; };
+    struct { v2 xy, zw; };
+    struct { v3 xyz; };
+    struct { f32 x_; v3 yzw; };
+    struct { f32 x__; v2 yz; f32 w_; };
+    f32 v[4];
 } v4;
+#define V4(x, y, z, w) (v4){{x, y, z, w}}
+#define COLOR(r, g, b, a) (v4){{r, g, b, a}}
 
 // Note(Wes): Memory
 typedef struct {
-        u32 size;
-        u32 index;
-        u8 *base;
+    u32 size;
+    u32 index;
+    u8 *base;
 } memory_arena_t;
 
 void init_arena(memory_arena_t *arena, u32 size, u8 *base)
 {
-        arena->size = size;
-        arena->base = base;
-        arena->index = 0;
+    arena->size = size;
+    arena->base = base;
+    arena->index = 0;
 }
 
 #define push_struct(arena, type) (type *) push_size(arena, sizeof(type))
-#define push_array(arena, count, type) (type *) push_size(arena, (count) * sizeof(type))
+#define push_array(arena, count, type)                                         \
+    (type *) push_size(arena, (count) * sizeof(type))
 void *push_size(memory_arena_t *arena, u32 size)
 {
-        assert((arena->index + size) <= arena->size);
-        void *result = arena->base + arena->index;
-        arena->index += size;
+    assert((arena->index + size) <= arena->size);
+    void *result = arena->base + arena->index;
+    arena->index += size;
 
-        return result;
+    return result;
 }
 
 typedef struct {
-        u8 *data; // Order is always RGBA
-        i32 width;
-        i32 height;
+    u8 *data; // Order is always RGBA
+    i32 width;
+    i32 height;
 } image_t;
 
 typedef struct {
-        unsigned char tiles[18 * 32];
-        v2 tile_size;
-        u16 tiles_wide;
-        u16 tiles_high;
+    unsigned char tiles[18 * 32];
+    v2 tile_size;
+    u16 tiles_wide;
+    u16 tiles_high;
 } tilemap_t;
 
 // Note(Wes): Entities
 typedef struct {
-        u32 max_frames;
-        u32 current_frame;
-        u32 fps;
-        f32 accumulator;
-        image_t *frames;
+    u32 max_frames;
+    u32 current_frame;
+    u32 fps;
+    f32 accumulator;
+    image_t *frames;
 } entity_anim_t;
 
 typedef enum {
-        entity_type_player,
-        entity_type_teleporter,
+    entity_type_player,
+    entity_type_teleporter,
 } entity_type_t;
 
 #define KATANA_MAX_HIT_ENTITIES 4
 typedef struct {
-        v2 katana_offset; // Offset from the players position depending on
-                          // which way the players is facing.
-        u32 hit_entities[KATANA_MAX_HIT_ENTITIES];
-        entity_anim_t walk;
-        entity_anim_t attack;
-        u32 teleporter_index;
-        b8 attacking;
+    v2 katana_offset; // Offset from the players position depending on
+                      // which way the players is facing.
+    u32 hit_entities[KATANA_MAX_HIT_ENTITIES];
+    entity_anim_t walk;
+    entity_anim_t attack;
+    u32 teleporter_index;
+    b8 attacking;
 } entity_player_t;
 
 typedef struct {
-        image_t *image;
+    image_t *image;
 } entity_teleporter_t;
 
 typedef struct {
-        v2 position;
-        v2 size;
-        v2 velocity;
-        v2 acceleration;
+    v2 position;
+    v2 size;
+    v2 velocity;
+    v2 acceleration;
 
-        f32 velocity_factor;
-        f32 acceleration_factor;
+    f32 velocity_factor;
+    f32 acceleration_factor;
 
-        b8 on_ground;
-        b8 exists;
+    b8 on_ground;
+    b8 exists;
 
-        entity_type_t type;
-        union {
-                entity_player_t player;
-                entity_teleporter_t teleporter;
-        };
+    entity_type_t type;
+    union {
+        entity_player_t player;
+        entity_teleporter_t teleporter;
+    };
 } entity_t;
 
 // Note(Wes): Renderer
 typedef struct {
-        v2 position;
-        f32 units_to_pixels;
+    v2 position;
+    f32 units_to_pixels;
 } camera_t;
 
-typedef enum { render_type_clear, render_type_block, render_type_image } render_type_t;
+typedef struct {
+    v2 origin;
+    v2 x_axis;
+    v2 y_axis;
+} render_basis_t;
+
+typedef enum {
+    render_type_clear,
+    render_type_block,
+    render_type_image,
+    render_type_rotated_block
+} render_type_t;
+
+typedef struct { 
+    render_type_t type;
+    render_basis_t basis;
+} render_cmd_header_t;
 
 typedef struct {
-        render_type_t type;
-        v4 color;
+    render_cmd_header_t header;
+    v4 color;
 } render_cmd_clear_t;
 
 typedef struct {
-        render_type_t type;
-        v2 pos;
-        v2 size;
-        v4 color;
+    render_cmd_header_t header;
+    v2 pos;
+    v2 size;
+    v4 color;
 } render_cmd_block_t;
 
 typedef struct {
-        render_type_t type;
-        v2 pos;
-        v2 size;
-        image_t *image;
-        b8 flip_x;
+    render_cmd_header_t header;
+    v2 pos;
+    v2 size;
+    image_t *image;
+    b8 flip_x;
 } render_cmd_image_t;
 
 typedef struct {
-        camera_t *camera;
+    camera_t *camera;
 
-        u32 size;
-        u32 index;
-        u8 *base;
+    u32 size;
+    u32 index;
+    u8 *base;
 } render_queue_t;
 
 // Note(Wes): Game
 #define KATANA_MAX_ENTITIES 512
 typedef struct {
-        entity_t entities[KATANA_MAX_ENTITIES];           // Entity 0 is the "null" entity
-        v2 camera_tracked_positions[KATANA_MAX_ENTITIES]; // Camera will
-                                                          // always ensure
-                                                          // these
-                                                          // positions are
-                                                          // in view.
-        u32 controlled_entities[KATANA_MAX_CONTROLLERS];
-        tilemap_t tilemap;
-        camera_t camera;
-        v2 gravity; // units/sec^2
+    entity_t entities[KATANA_MAX_ENTITIES]; // Entity 0 is the "null" entity
+    v2 camera_tracked_positions[KATANA_MAX_ENTITIES]; // Camera will
+                                                      // always ensure
+                                                      // these
+                                                      // positions are
+                                                      // in view.
+    u32 controlled_entities[KATANA_MAX_CONTROLLERS];
+    tilemap_t tilemap;
+    camera_t camera;
+    v2 gravity; // units/sec^2
 } world_t;
 
 typedef struct {
-        world_t world;
-        image_t background_image;
-        image_t tile_image;
-        image_t player_images[6];
-        image_t player_attack_images[6];
-        image_t green_teleporter;
+    world_t world;
+    image_t background_image;
+    image_t tile_image;
+    image_t player_images[6];
+    image_t player_attack_images[6];
+    image_t green_teleporter;
 
-        memory_arena_t arena;
-        memory_arena_t frame_arena;
+    memory_arena_t arena;
+    memory_arena_t frame_arena;
 
-        render_queue_t *render_queue;
+    render_queue_t *render_queue;
 
-        f32 t_sine;
-        i32 tone_hz;
+    f32 t_sine;
+    i32 tone_hz;
 } game_state_t;

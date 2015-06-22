@@ -1,12 +1,6 @@
 #include "katana_types.h"
 #include "katana_intrinsics.h"
 
-v2 v2_zero()
-{
-        v2 dst = {0, 0};
-        return dst;
-}
-
 v2 v2_add(v2 a, v2 b)
 {
         v2 sum;
