@@ -15,7 +15,7 @@ BUILD_DIR = build
 
 
 .PHONY: all
-all: $(BUILD_DIR) $(BIN_TARGET) $(GAME_TARGET)
+all: $(BUILD_DIR) $(BIN_TARGET) $(GAME_TARGET) tags cscope.out
 
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
@@ -25,6 +25,13 @@ $(BIN_TARGET):
 
 $(GAME_TARGET):
 	$(CC) $(GAME_SRC) -shared -o $(BUILD_DIR)/$(GAME_TARGET) $(CFLAGS) $(DEFINES) $(DISABLED_WARNINGS)
+
+tags:
+	/usr/local/bin/ctags -R --exclude=.git --exclude=build --extra=+f --languages=c --tag-relative
+
+cscope.out:
+	/usr/local/bin/cscope -R -b
+
 
 clean:
 	@rm -rf $(BUILD_DIR)
