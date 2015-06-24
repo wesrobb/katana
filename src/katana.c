@@ -1,7 +1,7 @@
 #include "katana_types.h"
 #include "katana_intrinsics.h"
 #include "katana_math.h"
-#include "katana_vec.c"
+#include "katana_vec.h"
 #include "katana_render.c"
 
 #define STB_ASSERT(x) assert(x);
@@ -586,7 +586,8 @@ void game_update_and_render(game_memory_t *memory,
                               : y_units_to_pixels;
     game_state->world.camera.units_to_pixels = units_to_pixels;
 
-    f32 cam_zoom_speed = 2.0f;
+    // TODO(Wes): Fix camera zoom rounding errors.
+    f32 cam_zoom_speed = 0.0f;
     game_state->world.camera.units_to_pixels =
         (game_state->world.camera.units_to_pixels *
          (1.0f - (input->delta_time * cam_zoom_speed))) +
@@ -670,7 +671,7 @@ void game_update_and_render(game_memory_t *memory,
                 anim = &entity->player.walk;
                 if (input->controllers[i].left_stick_x != 0.0f) {
                     f32 anim_fps =
-                        katana_absf(input->controllers[i].left_stick_x) *
+                        kabsf(input->controllers[i].left_stick_x) *
                         anim->fps;
                     if (anim->accumulator + input->delta_time >=
                         (1.0f / anim_fps)) {
@@ -716,7 +717,11 @@ void game_update_and_render(game_memory_t *memory,
         }
     }
 
-    render_basis_t basis = {V2(30.0f, 30.0f), V2(10, 0), V2(0, 10)};
+
+    game_state->elapsed_time += input->delta_time;
+    f32 angle = game_state->elapsed_time;
+    v2 x_axis = v2_mul(V2(kcos(angle), ksin(angle)), 10);
+    render_basis_t basis = {V2(30.0f, 30.0f), x_axis, v2_perp(x_axis)};
     render_push_rotated_block(game_state->render_queue, &basis, V2(2, 2),
                               COLOR(1, 0, 1, 1));
 

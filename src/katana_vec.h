@@ -1,44 +1,44 @@
+#pragma once
+
 #include "katana_types.h"
 #include "katana_intrinsics.h"
 
-v2 v2_add(v2 a, v2 b)
+static inline v2 v2_add(v2 a, v2 b)
 {
-    v2 sum;
-    sum.x = a.x + b.x;
-    sum.y = a.y + b.y;
-    return sum;
+    return V2(a.x + b.x, a.y + b.y);
 }
 
-v2 v2_sub(v2 a, v2 b)
+static inline v2 v2_sub(v2 a, v2 b)
 {
-    v2 diff;
-    diff.x = a.x - b.x;
-    diff.y = a.y - b.y;
-    return diff;
+    return V2(a.x - b.x, a.y - b.y);
 }
 
-v2 v2_mul(v2 a, f32 scalar)
+static inline v2 v2_mul(v2 a, f32 scalar)
 {
-    v2 product;
-    product.x = a.x * scalar;
-    product.y = a.y * scalar;
-    return product;
+    return V2(a.x * scalar, a.y * scalar);
 }
 
-v2 v2_div(v2 a, f32 scalar)
+static inline v2 v2_div(v2 a, f32 scalar)
 {
-    v2 quotient;
-    quotient.x = a.x / scalar;
-    quotient.y = a.y / scalar;
-    return quotient;
+    return V2(a.x / scalar, a.y / scalar);
 }
 
-f32 v2_dot(v2 a, v2 b)
+static inline v2 v2_perp(v2 a)
 {
-    return a.x * b.x + a.y + b.y;
+    return V2(-a.y, a.x);
 }
 
-void v2_round2(v2 a, v2 b, v2i *a_result, v2i *b_result)
+static inline v2 v2_neg(v2 a)
+{
+    return V2(-a.x, -a.y);
+}
+
+static inline f32 v2_dot(v2 a, v2 b)
+{
+    return (a.x * b.x) + (a.y * b.y);
+}
+
+static inline void v2_round2(v2 a, v2 b, v2i *a_result, v2i *b_result)
 {
     assert(a_result);
     assert(b_result);
@@ -59,7 +59,7 @@ void v2_round2(v2 a, v2 b, v2i *a_result, v2i *b_result)
     b_result->y = (i32)results[3];
 }
 
-void v2_floor2(v2 a, v2 b, v2i *a_result, v2i *b_result)
+static inline void v2_floor2(v2 a, v2 b, v2i *a_result, v2i *b_result)
 {
     assert(a_result);
     assert(b_result);
@@ -80,7 +80,7 @@ void v2_floor2(v2 a, v2 b, v2i *a_result, v2i *b_result)
     b_result->y = (i32)results[3];
 }
 
-void v2_ceil2(v2 a, v2 b, v2i *a_result, v2i *b_result)
+static inline void v2_ceil2(v2 a, v2 b, v2i *a_result, v2i *b_result)
 {
     assert(a_result);
     assert(b_result);
@@ -102,7 +102,7 @@ void v2_ceil2(v2 a, v2 b, v2i *a_result, v2i *b_result)
 }
 
 // Converts the specified vector into 1 on each axis preserving the sign.
-v2i v2_sign(v2 src)
+static inline v2i v2_sign(v2 src)
 {
     v2i result = {};
     if (src.x > 0.0f) {
@@ -118,7 +118,7 @@ v2i v2_sign(v2 src)
     return result;
 }
 
-v2 v2_lerp(v2 v0, v2 v1, f32 t)
+static inline v2 v2_lerp(v2 v0, v2 v1, f32 t)
 {
     return v2_add(v2_mul(v1, t), v2_mul(v0, 1.0f - t));
 }

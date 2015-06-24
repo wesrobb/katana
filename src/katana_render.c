@@ -1,4 +1,5 @@
 #include "katana_types.h"
+#include "katana_vec.h"
 
 static inline void linear_blend(u32 src, u32 *dest)
 {
@@ -25,6 +26,11 @@ static inline u32 color_to_u32(v4 color)
                  ((u32)(color.g * 255) & 0xFF) << 8 |
                  ((u32)(color.a * 255) & 0xFF);
     return result;
+}
+
+static inline u32 *pixel(game_frame_buffer_t *frame_buffer, i32 x, i32 y)
+{
+    return &frame_buffer->pixels[y * frame_buffer->width + x];
 }
 
 static void render_clear(render_cmd_clear_t *cmd,
@@ -97,19 +103,92 @@ static void render_block(v2 pos, v2 size, v4 color, camera_t *cam,
     }
 }
 
+#include <stdio.h>
 static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam,
                                  game_frame_buffer_t *frame_buffer)
 {
     render_basis_t basis = cmd->header.basis;
-    v2 size = V2(2, 2);
-    v4 color = COLOR(1, 0, 1, 1);
+    v2 size = V2(1, 1);
+    v4 color = COLOR(1, 1, 0, 1);
+
     render_block(basis.origin, size, color, cam, frame_buffer);
     render_block(v2_add(basis.origin, basis.x_axis), size, color, cam,
                  frame_buffer);
     render_block(v2_add(basis.origin, basis.y_axis), size, color, cam,
                  frame_buffer);
-    for (u32 y = 0; y < frame_buffer->height; y++) {
-        for (u32 x = 0; x < frame_buffer->width; x++) {
+
+    v2 origin = v2_mul(basis.origin, cam->units_to_pixels);
+    v2 x_axis = v2_mul(basis.x_axis, cam->units_to_pixels);
+    v2 y_axis = v2_mul(basis.y_axis, cam->units_to_pixels);
+
+    i32 max_width = frame_buffer->width - 1;
+    i32 max_height = frame_buffer->height - 1;
+    i32 x_min = max_width;
+    i32 x_max = 0;
+    i32 y_min = max_height;
+    i32 y_max = 0;
+
+    // NOTE(Wes): Find the max rect we could possible draw in regardless
+    // of rotation.
+    v2i floor_bounds[4];
+    v2_floor2(origin, v2_add(origin, x_axis), &floor_bounds[0],
+              &floor_bounds[1]);
+    v2_floor2(v2_add(origin, y_axis), v2_add(v2_add(origin, y_axis), x_axis),
+              &floor_bounds[2], &floor_bounds[3]);
+
+    v2i ceil_bounds[4];
+    v2_ceil2(origin, v2_add(origin, x_axis), &ceil_bounds[0], &ceil_bounds[1]);
+    v2_ceil2(v2_add(origin, y_axis), v2_add(v2_add(origin, y_axis), x_axis),
+             &ceil_bounds[2], &ceil_bounds[3]);
+
+    for (u32 i = 0; i < 4; ++i) {
+        v2i floor_bound = floor_bounds[i];
+        v2i ceil_bound = ceil_bounds[i];
+        if (x_min > floor_bound.x) {
+            x_min = floor_bound.x;
+        }
+        if (y_min > floor_bound.y) {
+            y_min = floor_bound.y;
+        }
+        if (x_max < ceil_bound.x) {
+            x_max = ceil_bound.x;
+        }
+        if (y_max < ceil_bound.y) {
+            y_max = ceil_bound.y;
+        }
+    }
+
+    // NOTE(Wes): Clip to frame_buffer edges.
+    if (x_min < 0) {
+        x_min = 0;
+    }
+    if (x_max > max_width) {
+        x_max = max_width;
+    }
+    if (y_min < 0) {
+        y_min = 0;
+    }
+    if (y_max < max_height) {
+        y_max = max_height;
+    }
+
+    for (i32 y = y_min; y <= y_max; y++) {
+        for (i32 x = x_min; x <= x_max; x++) {
+            // NOTE(Wes): Take the dot product of the point and the axis
+            // perpendicular to the one we are testing to see which side
+            // the point lies on. This code moves the point p in an
+            // anti-clockwise direction.
+            v2 p = v2_sub(V2(x, y), origin);
+            f32 edge1 = v2_dot(p, v2_neg(y_axis));
+            p = v2_sub(p, x_axis);
+            f32 edge2 = v2_dot(p, x_axis);
+            p = v2_sub(p, y_axis);
+            f32 edge3 = v2_dot(p, y_axis);
+            p = v2_add(p, x_axis);
+            f32 edge4 = v2_dot(p, v2_neg(x_axis));
+            if (edge1 < 0 && edge2 < 0 && edge3 < 0 && edge4 < 0) {
+                *pixel(frame_buffer, x, y) = color_to_u32(cmd->color);
+            }
         }
     }
 }

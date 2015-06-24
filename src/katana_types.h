@@ -203,4 +203,6 @@ typedef struct {
 
     f32 t_sine;
     i32 tone_hz;
+    // TODO(Wes): Just for testing rotated rectangle rendering.
+    f32 elapsed_time;
 } game_state_t;
