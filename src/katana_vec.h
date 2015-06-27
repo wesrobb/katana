@@ -38,6 +38,11 @@ static inline f32 v2_dot(v2 a, v2 b)
     return (a.x * b.x) + (a.y * b.y);
 }
 
+static inline f32 v2_len_sq(v2 a)
+{
+    return v2_dot(a, a);
+}
+
 static inline void v2_round2(v2 a, v2 b, v2i *a_result, v2i *b_result)
 {
     assert(a_result);
@@ -121,4 +126,19 @@ static inline v2i v2_sign(v2 src)
 static inline v2 v2_lerp(v2 v0, v2 v1, f32 t)
 {
     return v2_add(v2_mul(v1, t), v2_mul(v0, 1.0f - t));
+}
+
+static inline v4 v4_add(v4 a, v4 b)
+{
+    return V4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
+}
+
+static inline v4 v4_mul(v4 a, f32 scalar)
+{
+    return V4(a.x * scalar, a.y * scalar, a.z * scalar, a.w * scalar);
+}
+
+static inline v4 v4_lerp(v4 v0, v4 v1, f32 t)
+{
+    return v4_add(v4_mul(v1, t), v4_mul(v0, 1.0f - t));
 }

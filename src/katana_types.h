@@ -9,30 +9,78 @@ typedef struct {
 } v2i;
 
 typedef union {
-    struct { f32 x, y; };
+    struct {
+        f32 x, y;
+    };
     f32 v[2];
 } v2;
-#define V2(x, y) (v2){{x, y}}
+#define V2(x, y)                                                               \
+    (v2)                                                                       \
+    {                                                                          \
+        {                                                                      \
+            x, y                                                               \
+        }                                                                      \
+    }
 
 typedef union {
-    struct { f32 x, y, z; };
-    struct { v2 xy; };
-    struct { f32 x_; v2 yz; };
+    struct {
+        f32 x, y, z;
+    };
+    struct {
+        v2 xy;
+    };
+    struct {
+        f32 x_;
+        v2 yz;
+    };
     f32 v[3];
 } v3;
-#define V3(x, y, z) (v3){{x, y, z}}
+#define V3(x, y, z)                                                            \
+    (v3)                                                                       \
+    {                                                                          \
+        {                                                                      \
+            x, y, z                                                            \
+        }                                                                      \
+    }
 
 typedef union {
-    struct { f32 x, y, z, w; };
-    struct { f32 r, g, b, a; };
-    struct { v2 xy, zw; };
-    struct { v3 xyz; };
-    struct { f32 x_; v3 yzw; };
-    struct { f32 x__; v2 yz; f32 w_; };
+    struct {
+        f32 x, y, z, w;
+    };
+    struct {
+        f32 r, g, b, a;
+    };
+    struct {
+        v2 xy, zw;
+    };
+    struct {
+        v3 xyz;
+    };
+    struct {
+        f32 x_;
+        v3 yzw;
+    };
+    struct {
+        f32 x__;
+        v2 yz;
+        f32 w_;
+    };
     f32 v[4];
 } v4;
-#define V4(x, y, z, w) (v4){{x, y, z, w}}
-#define COLOR(r, g, b, a) (v4){{r, g, b, a}}
+#define V4(x, y, z, w)                                                         \
+    (v4)                                                                       \
+    {                                                                          \
+        {                                                                      \
+            x, y, z, w                                                         \
+        }                                                                      \
+    }
+#define COLOR(r, g, b, a)                                                      \
+    (v4)                                                                       \
+    {                                                                          \
+        {                                                                      \
+            r, g, b, a                                                         \
+        }                                                                      \
+    }
 
 // Note(Wes): Memory
 typedef struct {
@@ -61,9 +109,9 @@ void *push_size(memory_arena_t *arena, u32 size)
 }
 
 typedef struct {
-    u8 *data; // Order is always RGBA
-    i32 width;
-    i32 height;
+    u32 *data; // Always 4bpp. Order is always RGBA
+    u32 w;
+    u32 h;
 } image_t;
 
 typedef struct {
@@ -140,7 +188,7 @@ typedef enum {
     render_type_rotated_block
 } render_type_t;
 
-typedef struct { 
+typedef struct {
     render_type_t type;
     render_basis_t basis;
 } render_cmd_header_t;
@@ -155,6 +203,7 @@ typedef struct {
     v2 pos;
     v2 size;
     v4 color;
+    image_t *image;
 } render_cmd_block_t;
 
 typedef struct {
@@ -195,6 +244,9 @@ typedef struct {
     image_t player_images[6];
     image_t player_attack_images[6];
     image_t green_teleporter;
+    // TODO(Wes): Remove test image.
+    image_t test_image;
+    image_t test_image2;
 
     memory_arena_t arena;
     memory_arena_t frame_arena;
