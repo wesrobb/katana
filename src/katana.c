@@ -1280,13 +1280,13 @@ void game_update_and_render(game_memory_t *memory,
 
     game_state->elapsed_time += input->delta_time;
     f32 angle = game_state->elapsed_time * 0.1f;
-    f32 disp = kcosf(angle) * 10.0f;
+    f32 disp = kcosf(angle) * 20.0f;
 #if 0
     v2 x_axis = v2_mul(V2(kcosf(angle), ksinf(angle)), 60);
     v2 y_axis = v2_perp(x_axis);
 #endif
-    v2 x_axis = V2(60.0f, 0.0f);
-    v2 y_axis = V2(0.0f, 60.0f);
+    v2 x_axis = V2(20.0f, 0.0f);
+    v2 y_axis = V2(0.0f, 20.0f);
 
     v2 origin = V2(40.0f, 40.0f);
     origin = v2_add(origin, V2(disp, 0.0f));

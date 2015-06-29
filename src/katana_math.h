@@ -48,3 +48,8 @@ static inline f32 klerp(f32 a, f32 b, f32 t)
 {
     return (1.0f - t) * a + t * b;
 }
+
+static inline f32 ksqrt(f32 a)
+{
+    return sqrtf(a);
+}

@@ -368,11 +368,14 @@ int main(void)
         // TODO(Wes): SDL_Init didn't work!
     }
 
-    u32 window_width = 1280;
-    u32 window_height = 720;
+    i32 window_width = 1280;
+    i32 window_height = 720;
+    i32 windoy_pos_x = 10;
+    i32 windoy_pos_y = 400;
+    
     SDL_Window *window = SDL_CreateWindow("Handmade Hero",
-                                          SDL_WINDOWPOS_UNDEFINED,
-                                          SDL_WINDOWPOS_UNDEFINED,
+                                          windoy_pos_x,
+                                          windoy_pos_y,
                                           window_width,
                                           window_height,
                                           SDL_WINDOW_RESIZABLE);

@@ -2,10 +2,48 @@
 #include "katana_types.h"
 #include "katana_vec.h"
 
-#define RED(c) ((c)&0xFF000000)
-#define GREEN(c) ((c)&0x00FF0000)
-#define BLUE(c) ((c)&0x0000FF00)
-#define ALPHA(c) ((c)&0x000000FF)
+static inline v4 read_image_color(u32 buffer)
+{
+    return COLOR(((buffer >> 0) & 0xFF) / 255.0f,
+                 ((buffer >> 8) & 0xFF) / 255.0f,
+                 ((buffer >> 16) & 0xFF) / 255.0f,
+                 ((buffer >> 24) & 0xFF) / 255.0f);
+}
+
+static inline v4 read_frame_buffer_color(u32 buffer)
+{
+    return COLOR(((buffer >> 24) & 0xFF) / 255.0f,
+                 ((buffer >> 16) & 0xFF) / 255.0f,
+                 ((buffer >> 8) & 0xFF) / 255.0f,
+                 ((buffer >> 0) & 0xFF) / 255.0f);
+}
+
+static inline u32 color_u32(v4 color)
+{
+    u32 result = ((u32)(color.r * 255) & 0xFF) << 24 |
+                 ((u32)(color.g * 255) & 0xFF) << 16 |
+                 ((u32)(color.b * 255) & 0xFF) << 8 |
+                 ((u32)(color.a * 255) & 0xFF);
+    return result;
+}
+
+static inline v4 srgb_to_linear(v4 color)
+{
+    color.r = color.r * color.r;
+    color.g = color.g * color.g;
+    color.b = color.b * color.b;
+
+    return color;
+}
+
+static inline v4 linear_to_srgb(v4 color)
+{
+    color.r = ksqrt(color.r);
+    color.g = ksqrt(color.g);
+    color.b = ksqrt(color.b);
+
+    return color;
+}
 
 static inline void linear_blend(v4 color, u32 *dest)
 {
@@ -25,9 +63,15 @@ static inline void linear_blend(v4 color, u32 *dest)
     u8 g = (u8)(gs * a + 0.5f) + (u8)(gd * inv_alpha + 0.5f);
     u8 b = (u8)(bs * a + 0.5f) + (u8)(bd * inv_alpha + 0.5f);
 
-    u32 temp = r << 24 | g << 16 | b << 8 | ad << 0;
+    u8 final_a = a + ad - a * ad;
+    *dest = r << 24 | g << 16 | b << 8 | final_a << 0;
+}
 
-    *dest = temp;
+static inline v4 linear_blend_colors(v4 color, v4 dest_color)
+{
+    u32 dest = color_u32(dest_color);
+    linear_blend(color, &dest);
+    return read_frame_buffer_color(dest);
 }
 
 // NOTE(Wes): Handle blending of texel from textures directly.
@@ -56,23 +100,6 @@ static inline void linear_blend_texel(u32 texel, u32 *dest)
     u32 temp = r << 24 | g << 16 | b << 8 | ad << 0;
 
     *dest = temp;
-}
-
-static inline u32 color_u32(v4 color)
-{
-    u32 result = ((u32)(color.r * 255) & 0xFF) << 24 |
-                 ((u32)(color.g * 255) & 0xFF) << 16 |
-                 ((u32)(color.b * 255) & 0xFF) << 8 |
-                 ((u32)(color.a * 255) & 0xFF);
-    return result;
-}
-
-static inline v4 read_image_color(u32 buffer)
-{
-    return COLOR(((buffer >> 0) & 0xFF) / 255.0f,
-                 ((buffer >> 8) & 0xFF) / 255.0f,
-                 ((buffer >> 16) & 0xFF) / 255.0f,
-                 ((buffer >> 24) & 0xFF) / 255.0f);
 }
 
 static void render_clear(render_cmd_clear_t *cmd,
@@ -255,8 +282,8 @@ static void render_rotated_block(render_cmd_block_t *cmd,
                 u32 texture_y = (u32)texel_y;
 
                 // NOTE(Wes): Get the rounded off value of the texel.
-                f32 fx = texel_x - texture_x;
-                f32 fy = texel_y - texture_y;
+                f32 fraction_x = texel_x - texture_x;
+                f32 fraction_y = texel_y - texture_y;
 
                 texture_x = kclamp(texture_x, 0, texture->w - 1);
                 texture_y = kclamp(texture_y, 0, texture->h - 1);
@@ -264,17 +291,33 @@ static void render_rotated_block(render_cmd_block_t *cmd,
                 u32 *texel = &texture->data[texture_y * texture->w + texture_x];
 
                 // NOTE(Wes): Blend the closest 4 texels for better looking
-                // pixels. Basically sub pixel rendering.
-                v4 texel00 = read_image_color(*texel);
-                v4 texel10 = read_image_color(*(texel + 1));
-                v4 texel01 = read_image_color(*(texel + texture->w));
-                v4 texel11 = read_image_color(*(texel + texture->w + 1));
+                // pixels. Bilinear blending.
+                v4 texel_a = read_image_color(*texel);
+                v4 texel_b = read_image_color(*(texel + 1));
+                v4 texel_c = read_image_color(*(texel + texture->w));
+                v4 texel_d = read_image_color(*(texel + texture->w + 1));
 
-                v4 blended_color = v4_lerp(v4_lerp(texel00, texel10, fx),
-                                           v4_lerp(texel01, texel11, fx),
-                                           fy);
+                // NOTE(Wes): Perform gamma correction on pixels
+                // before blending them to ensure all math is done
+                // in linear space.
+                texel_a = srgb_to_linear(texel_a);
+                texel_b = srgb_to_linear(texel_b);
+                texel_c = srgb_to_linear(texel_c);
+                texel_d = srgb_to_linear(texel_d);
 
-                linear_blend(blended_color, &fb_data[x + y * frame_buffer->w]);
+                v4 blended_color =
+                    v4_lerp(v4_lerp(texel_a, texel_b, fraction_x),
+                            v4_lerp(texel_c, texel_d, fraction_x),
+                            fraction_y);
+
+                u32 *fb_pixel = &fb_data[x + y * frame_buffer->w];
+                v4 dest_color = read_frame_buffer_color(*fb_pixel);
+
+                dest_color = srgb_to_linear(dest_color);
+                dest_color = linear_blend_colors(blended_color, dest_color);
+                dest_color = linear_to_srgb(dest_color);
+
+                *fb_pixel = color_u32(dest_color);
             }
         }
     }

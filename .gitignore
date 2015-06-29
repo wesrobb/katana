@@ -1,6 +1,7 @@
 build
 projects
 tags
+ide
 cscope.out
 .DS_Store
 
