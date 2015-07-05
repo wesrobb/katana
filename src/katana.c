@@ -389,6 +389,29 @@ static image_t load_image(const char *path, map_file_fn map_file)
                                                (int *)&result.h,
                                                &unused,
                                                required_components);
+
+    // NOTE(Wes): Pre-multiply alpha.
+    for (u32 y = 0; y < result.h; y++) {
+        for (u32 x = 0; x < result.w; x++) {
+            u32 *texel = &result.data[x + y * result.w];
+            v4 color = read_image_color(*texel);
+
+            // NOTE(Wes): Convert to linear space before premultiplying alpha.
+            color = srgb_to_linear(color);
+
+            // NOTE(Wes): Premultiple Normalized alpha
+            // but not normalized color values.
+            v3 rgb = v3_mul(color.rgb, 255.0f);
+            rgb = v3_mul(rgb, color.a);
+
+            color.r = rgb.r / 255.0f;
+            color.g = rgb.g / 255.0f;
+            color.b = rgb.b / 255.0f;
+
+            color = linear_to_srgb(color);
+            *texel = color_image_32(color);
+        }
+    }
     return result;
 }
 
@@ -1296,7 +1319,7 @@ void game_update_and_render(game_memory_t *memory,
     render_push_rotated_block(game_state->render_queue,
                               &basis,
                               V2(2, 2),
-                              COLOR(1, 0, 1, 1),
+                              COLOR(1, 1, 0, 0.2f),
                               &game_state->player_images[0]);
 
     render_draw_queue(game_state->render_queue, frame_buffer);

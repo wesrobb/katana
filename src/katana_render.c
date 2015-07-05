@@ -18,12 +18,21 @@ static inline v4 read_frame_buffer_color(u32 buffer)
                  ((buffer >> 0) & 0xFF) / 255.0f);
 }
 
-static inline u32 color_u32(v4 color)
+static inline u32 color_frame_buffer_u32(v4 color)
 {
     u32 result = ((u32)(color.r * 255) & 0xFF) << 24 |
                  ((u32)(color.g * 255) & 0xFF) << 16 |
                  ((u32)(color.b * 255) & 0xFF) << 8 |
                  ((u32)(color.a * 255) & 0xFF);
+    return result;
+}
+
+static inline u32 color_image_32(v4 color)
+{
+    u32 result = ((u32)(color.r * 255) & 0xFF) << 0 |
+                 ((u32)(color.g * 255) & 0xFF) << 8 |
+                 ((u32)(color.b * 255) & 0xFF) << 16 |
+                 ((u32)(color.a * 255) & 0xFF) << 24;
     return result;
 }
 
@@ -45,8 +54,9 @@ static inline v4 linear_to_srgb(v4 color)
     return color;
 }
 
-static inline void linear_blend(v4 color, u32 *dest)
+static inline void linear_blend(v4 color, v4 tint, u32 *dest)
 {
+    color = v4_hadamard(color, tint);
     f32 a = color.a;
     f32 inv_alpha = 1.0f - a;
 
@@ -59,18 +69,18 @@ static inline void linear_blend(v4 color, u32 *dest)
     u8 bd = (*dest >> 8) & 0xFF;
     u8 ad = (*dest >> 0) & 0xFF;
 
-    u8 r = (u8)(rs * a + 0.5f) + (u8)(rd * inv_alpha + 0.5f);
-    u8 g = (u8)(gs * a + 0.5f) + (u8)(gd * inv_alpha + 0.5f);
-    u8 b = (u8)(bs * a + 0.5f) + (u8)(bd * inv_alpha + 0.5f);
+    u8 r = (u8)(rs) + (u8)(rd * inv_alpha + 0.5f);
+    u8 g = (u8)(gs) + (u8)(gd * inv_alpha + 0.5f);
+    u8 b = (u8)(bs) + (u8)(bd * inv_alpha + 0.5f);
 
     u8 final_a = a + ad - a * ad;
     *dest = r << 24 | g << 16 | b << 8 | final_a << 0;
 }
 
-static inline v4 linear_blend_colors(v4 color, v4 dest_color)
+static inline v4 linear_blend_colors(v4 color, v4 tint, v4 dest_color)
 {
-    u32 dest = color_u32(dest_color);
-    linear_blend(color, &dest);
+    u32 dest = color_frame_buffer_u32(dest_color);
+    linear_blend(color, tint, &dest);
     return read_frame_buffer_color(dest);
 }
 
@@ -93,9 +103,9 @@ static inline void linear_blend_texel(u32 texel, u32 *dest)
     u8 bd = (*dest >> 8) & 0xFF;
     u8 ad = (*dest >> 0) & 0xFF;
 
-    u8 r = (u8)(rs * a + 0.5f) + (u8)(rd * inv_alpha + 0.5f);
-    u8 g = (u8)(gs * a + 0.5f) + (u8)(gd * inv_alpha + 0.5f);
-    u8 b = (u8)(bs * a + 0.5f) + (u8)(bd * inv_alpha + 0.5f);
+    u8 r = (u8)(rs) + (u8)(rd * inv_alpha + 0.5f);
+    u8 g = (u8)(gs) + (u8)(gd * inv_alpha + 0.5f);
+    u8 b = (u8)(bs) + (u8)(bd * inv_alpha + 0.5f);
 
     u32 temp = r << 24 | g << 16 | b << 8 | ad << 0;
 
@@ -248,6 +258,7 @@ static void render_rotated_block(render_cmd_block_t *cmd,
     f32 inv_y_len_sq = 1.0f / v2_len_sq(y_axis);
 
     image_t *texture = cmd->image;
+    v4 tint = cmd->tint;
 
     u32 *fb_data = frame_buffer->data;
     for (i32 y = y_min; y <= y_max; y++) {
@@ -314,10 +325,10 @@ static void render_rotated_block(render_cmd_block_t *cmd,
                 v4 dest_color = read_frame_buffer_color(*fb_pixel);
 
                 dest_color = srgb_to_linear(dest_color);
-                dest_color = linear_blend_colors(blended_color, dest_color);
+                dest_color = linear_blend_colors(blended_color, tint, dest_color);
                 dest_color = linear_to_srgb(dest_color);
 
-                *fb_pixel = color_u32(dest_color);
+                *fb_pixel = color_frame_buffer_u32(dest_color);
             }
         }
     }
@@ -427,20 +438,20 @@ void render_push_clear(render_queue_t *queue, v4 color)
     cmd->color = color;
 }
 
-void render_push_block(render_queue_t *queue, v2 pos, v2 size, v4 color)
+void render_push_block(render_queue_t *queue, v2 pos, v2 size, v4 tint)
 {
     render_cmd_block_t *cmd = (render_cmd_block_t *)render_push_cmd(
         queue, sizeof(render_cmd_block_t));
     cmd->header.type = render_type_block;
     cmd->pos = pos;
     cmd->size = size;
-    cmd->color = color;
+    cmd->tint = tint;
 }
 
 void render_push_rotated_block(render_queue_t *queue,
                                render_basis_t *basis,
                                v2 size,
-                               v4 color,
+                               v4 tint,
                                image_t *image)
 {
     render_cmd_block_t *cmd = (render_cmd_block_t *)render_push_cmd(
@@ -448,7 +459,7 @@ void render_push_rotated_block(render_queue_t *queue,
     cmd->header.type = render_type_rotated_block;
     cmd->header.basis = *basis;
     cmd->size = size;
-    cmd->color = color;
+    cmd->tint = tint;
     cmd->image = image;
 }
 
@@ -492,7 +503,7 @@ void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer)
         case render_type_block: {
             render_cmd_block_t *cmd = (render_cmd_block_t *)header;
             render_block(
-                cmd->pos, cmd->size, cmd->color, queue->camera, frame_buffer);
+                cmd->pos, cmd->size, cmd->tint, queue->camera, frame_buffer);
             address += sizeof(render_cmd_block_t);
         } break;
         case render_type_rotated_block:

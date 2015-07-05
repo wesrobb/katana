@@ -27,6 +27,9 @@ typedef union {
         f32 x, y, z;
     };
     struct {
+        f32 r, g, b;
+    };
+    struct {
         v2 xy;
     };
     struct {
@@ -55,6 +58,11 @@ typedef union {
     };
     struct {
         v3 xyz;
+        f32 w_;
+    };
+    struct {
+        v3 rgb;
+        f32 a_;
     };
     struct {
         f32 x_;
@@ -63,7 +71,7 @@ typedef union {
     struct {
         f32 x__;
         v2 yz;
-        f32 w_;
+        f32 w__;
     };
     f32 v[4];
 } v4;
@@ -202,7 +210,7 @@ typedef struct {
     render_cmd_header_t header;
     v2 pos;
     v2 size;
-    v4 color;
+    v4 tint;
     image_t *image;
 } render_cmd_block_t;
 

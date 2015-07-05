@@ -128,6 +128,11 @@ static inline v2 v2_lerp(v2 v0, v2 v1, f32 t)
     return v2_add(v2_mul(v1, t), v2_mul(v0, 1.0f - t));
 }
 
+static inline v3 v3_mul(v3 a, f32 scalar)
+{
+    return V3(a.x * scalar, a.y * scalar, a.z * scalar);
+}
+
 static inline v4 v4_add(v4 a, v4 b)
 {
     return V4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
@@ -141,4 +146,9 @@ static inline v4 v4_mul(v4 a, f32 scalar)
 static inline v4 v4_lerp(v4 v0, v4 v1, f32 t)
 {
     return v4_add(v4_mul(v1, t), v4_mul(v0, 1.0f - t));
+}
+
+static inline v4 v4_hadamard(v4 a, v4 b)
+{
+    return V4(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w);
 }
