@@ -20,10 +20,10 @@ static inline v4 read_frame_buffer_color(u32 buffer)
 
 static inline u32 color_frame_buffer_u32(v4 color)
 {
-    u32 result = ((u32)(color.r * 255) & 0xFF) << 24 |
-                 ((u32)(color.g * 255) & 0xFF) << 16 |
-                 ((u32)(color.b * 255) & 0xFF) << 8 |
-                 ((u32)(color.a * 255) & 0xFF);
+    u32 result = ((u32)(color.r * 255.0f + 0.5f) & 0xFF) << 24 |
+                 ((u32)(color.g * 255.0f + 0.5f) & 0xFF) << 16 |
+                 ((u32)(color.b * 255.0f + 0.5f) & 0xFF) << 8 |
+                 ((u32)(color.a * 255.0f + 0.5f) & 0xFF);
     return result;
 }
 
@@ -54,34 +54,13 @@ static inline v4 linear_to_srgb(v4 color)
     return color;
 }
 
-static inline void linear_blend(v4 color, v4 tint, u32 *dest)
+static inline v4 linear_blend(v4 color, v4 tint, v4 dest)
 {
     color = v4_hadamard(color, tint);
     f32 a = color.a;
     f32 inv_alpha = 1.0f - a;
 
-    u8 rs = (u8)(color.r * 255.0f + 0.5f);
-    u8 gs = (u8)(color.g * 255.0f + 0.5f);
-    u8 bs = (u8)(color.b * 255.0f + 0.5f);
-
-    u8 rd = (*dest >> 24) & 0xFF;
-    u8 gd = (*dest >> 16) & 0xFF;
-    u8 bd = (*dest >> 8) & 0xFF;
-    u8 ad = (*dest >> 0) & 0xFF;
-
-    u8 r = (u8)(rs) + (u8)(rd * inv_alpha + 0.5f);
-    u8 g = (u8)(gs) + (u8)(gd * inv_alpha + 0.5f);
-    u8 b = (u8)(bs) + (u8)(bd * inv_alpha + 0.5f);
-
-    u8 final_a = a + ad - a * ad;
-    *dest = r << 24 | g << 16 | b << 8 | final_a << 0;
-}
-
-static inline v4 linear_blend_colors(v4 color, v4 tint, v4 dest_color)
-{
-    u32 dest = color_frame_buffer_u32(dest_color);
-    linear_blend(color, tint, &dest);
-    return read_frame_buffer_color(dest);
+    return v4_add(v4_mul(dest, inv_alpha), v4_mul(color, a));
 }
 
 // NOTE(Wes): Handle blending of texel from textures directly.
@@ -103,9 +82,9 @@ static inline void linear_blend_texel(u32 texel, u32 *dest)
     u8 bd = (*dest >> 8) & 0xFF;
     u8 ad = (*dest >> 0) & 0xFF;
 
-    u8 r = (u8)(rs) + (u8)(rd * inv_alpha + 0.5f);
-    u8 g = (u8)(gs) + (u8)(gd * inv_alpha + 0.5f);
-    u8 b = (u8)(bs) + (u8)(bd * inv_alpha + 0.5f);
+    u8 r = (u8)(rs + 0.5f) + (u8)(rd * inv_alpha + 0.5f);
+    u8 g = (u8)(gs + 0.5f) + (u8)(gd * inv_alpha + 0.5f);
+    u8 b = (u8)(bs + 0.5f) + (u8)(bd * inv_alpha + 0.5f);
 
     u32 temp = r << 24 | g << 16 | b << 8 | ad << 0;
 
@@ -325,7 +304,7 @@ static void render_rotated_block(render_cmd_block_t *cmd,
                 v4 dest_color = read_frame_buffer_color(*fb_pixel);
 
                 dest_color = srgb_to_linear(dest_color);
-                dest_color = linear_blend_colors(blended_color, tint, dest_color);
+                dest_color = linear_blend(blended_color, tint, dest_color);
                 dest_color = linear_to_srgb(dest_color);
 
                 *fb_pixel = color_frame_buffer_u32(dest_color);

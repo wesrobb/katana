@@ -255,6 +255,7 @@ typedef struct {
     // TODO(Wes): Remove test image.
     image_t test_image;
     image_t test_image2;
+    image_t test_image3;
 
     memory_arena_t arena;
     memory_arena_t frame_arena;

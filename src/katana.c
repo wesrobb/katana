@@ -1030,6 +1030,8 @@ void game_update_and_render(game_memory_t *memory,
             load_image("data/test_image.png", callbacks->map_file);
         game_state->test_image2 =
             load_image("data/test_image2.png", callbacks->map_file);
+        game_state->test_image3 =
+            load_image("data/test_image3.png", callbacks->map_file);
         game_state->background_image =
             load_image("data/background/Bg 1.png", callbacks->map_file);
         game_state->tile_image =
@@ -1192,8 +1194,9 @@ void game_update_and_render(game_memory_t *memory,
     }
 #endif
     // NOTE(Wes): Start by clearing the screen.
-    render_push_clear(game_state->render_queue, COLOR(0.0f, 1.0f, 1.0f, 1.0f));
+    render_push_clear(game_state->render_queue, COLOR(1.0f, 1.0f, 1.0f, 1.0f));
 
+#if 1
     v2 background_pos = V2(64.0f, 36.0f);
     v2 background_size = V2(128.0f, 72.0f);
     render_push_image(game_state->render_queue,
@@ -1201,7 +1204,6 @@ void game_update_and_render(game_memory_t *memory,
                       background_size,
                       &game_state->background_image,
                       0);
-
     for (u32 i = 0; i < 18; ++i) {
         for (u32 j = 0; j < 32; ++j) {
             if (tilemap->tiles[j + i * tilemap->tiles_wide]) {
@@ -1218,6 +1220,7 @@ void game_update_and_render(game_memory_t *memory,
             }
         }
     }
+#endif
 
     for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
         u32 controlled_entity = game_state->world.controlled_entities[i];
@@ -1319,7 +1322,7 @@ void game_update_and_render(game_memory_t *memory,
     render_push_rotated_block(game_state->render_queue,
                               &basis,
                               V2(2, 2),
-                              COLOR(1, 1, 0, 0.2f),
+                              COLOR(1, 1, 1, 1),
                               &game_state->player_images[0]);
 
     render_draw_queue(game_state->render_queue, frame_buffer);
