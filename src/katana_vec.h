@@ -43,6 +43,16 @@ static inline f32 v2_len_sq(v2 a)
     return v2_dot(a, a);
 }
 
+static inline f32 v2_len(v2 a)
+{
+    return ksqrt(v2_len_sq(a));
+}
+
+static inline v2 v2_normalize(v2 a)
+{
+    return v2_div(a, v2_len(a));
+}
+
 static inline void v2_round2(v2 a, v2 b, v2i *a_result, v2i *b_result)
 {
     assert(a_result);
@@ -128,9 +138,49 @@ static inline v2 v2_lerp(v2 v0, v2 v1, f32 t)
     return v2_add(v2_mul(v1, t), v2_mul(v0, 1.0f - t));
 }
 
+static inline v3 v3_add(v3 a, v3 b)
+{
+    return V3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+
+static inline v3 v3_sub(v3 a, v3 b)
+{
+    return V3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
 static inline v3 v3_mul(v3 a, f32 scalar)
 {
     return V3(a.x * scalar, a.y * scalar, a.z * scalar);
+}
+
+static inline v3 v3_div(v3 a, f32 scalar)
+{
+    return V3(a.x / scalar, a.y / scalar, a.z / scalar);
+}
+
+static inline f32 v3_dot(v3 a, v3 b)
+{
+    return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
+}
+
+static inline f32 v3_len_sq(v3 a)
+{
+    return v3_dot(a, a);
+}
+
+static inline f32 v3_len(v3 a)
+{
+    return ksqrt(v3_len_sq(a));
+}
+
+static inline v3 v3_normalize(v3 a)
+{
+    return v3_div(a, v3_len(a));
+}
+
+static inline v3 v3_hadamard(v3 a, v3 b)
+{
+    return V3(a.x * b.x, a.y * b.y, a.z * b.z);
 }
 
 static inline v4 v4_add(v4 a, v4 b)
@@ -138,9 +188,19 @@ static inline v4 v4_add(v4 a, v4 b)
     return V4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
 }
 
+static inline v4 v4_sub(v4 a, v4 b)
+{
+    return V4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w);
+}
+
 static inline v4 v4_mul(v4 a, f32 scalar)
 {
     return V4(a.x * scalar, a.y * scalar, a.z * scalar, a.w * scalar);
+}
+
+static inline v4 v4_div(v4 a, f32 scalar)
+{
+    return V4(a.x / scalar, a.y / scalar, a.z / scalar, a.w / scalar);
 }
 
 static inline v4 v4_lerp(v4 v0, v4 v1, f32 t)
@@ -148,7 +208,27 @@ static inline v4 v4_lerp(v4 v0, v4 v1, f32 t)
     return v4_add(v4_mul(v1, t), v4_mul(v0, 1.0f - t));
 }
 
+static inline f32 v4_dot(v4 a, v4 b)
+{
+    return (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w);
+}
+
 static inline v4 v4_hadamard(v4 a, v4 b)
 {
     return V4(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w);
+}
+
+static inline f32 v4_len_sq(v4 a)
+{
+    return v4_dot(a, a);
+}
+
+static inline f32 v4_len(v4 a)
+{
+    return ksqrt(v4_len_sq(a));
+}
+
+static inline v4 v4_normalize(v4 a)
+{
+    return v4_div(a, v4_len(a));
 }

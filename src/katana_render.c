@@ -20,19 +20,15 @@ static inline v4 read_frame_buffer_color(u32 buffer)
 
 static inline u32 color_frame_buffer_u32(v4 color)
 {
-    u32 result = ((u32)(color.r * 255.0f + 0.5f) & 0xFF) << 24 |
-                 ((u32)(color.g * 255.0f + 0.5f) & 0xFF) << 16 |
-                 ((u32)(color.b * 255.0f + 0.5f) & 0xFF) << 8 |
-                 ((u32)(color.a * 255.0f + 0.5f) & 0xFF);
+    u32 result = ((u32)(color.r * 255.0f + 0.5f) & 0xFF) << 24 | ((u32)(color.g * 255.0f + 0.5f) & 0xFF) << 16 |
+                 ((u32)(color.b * 255.0f + 0.5f) & 0xFF) << 8 | ((u32)(color.a * 255.0f + 0.5f) & 0xFF);
     return result;
 }
 
 static inline u32 color_image_32(v4 color)
 {
-    u32 result = ((u32)(color.r * 255) & 0xFF) << 0 |
-                 ((u32)(color.g * 255) & 0xFF) << 8 |
-                 ((u32)(color.b * 255) & 0xFF) << 16 |
-                 ((u32)(color.a * 255) & 0xFF) << 24;
+    u32 result = ((u32)(color.r * 255) & 0xFF) << 0 | ((u32)(color.g * 255) & 0xFF) << 8 |
+                 ((u32)(color.b * 255) & 0xFF) << 16 | ((u32)(color.a * 255) & 0xFF) << 24;
     return result;
 }
 
@@ -91,31 +87,23 @@ static inline void linear_blend_texel(u32 texel, u32 *dest)
     *dest = temp;
 }
 
-static void render_clear(render_cmd_clear_t *cmd,
-                         game_frame_buffer_t *frame_buffer)
+static void render_clear(render_cmd_clear_t *cmd, game_frame_buffer_t *frame_buffer)
 {
     for (u32 y = 0; y < frame_buffer->h; ++y) {
         u32 *pixels = frame_buffer->data + y * frame_buffer->pitch;
         for (u32 x = 0; x < frame_buffer->w; ++x) {
-            pixels[x] = (u8)(cmd->color.r * 255.0f + 0.5f) << 24 |
-                        (u8)(cmd->color.g * 255.0f + 0.5f) << 16 |
-                        (u8)(cmd->color.b * 255.0f + 0.5f) << 8 |
-                        (u8)(cmd->color.a * 255.0f + 0.5f) << 0;
+            pixels[x] = (u8)(cmd->color.r * 255.0f + 0.5f) << 24 | (u8)(cmd->color.g * 255.0f + 0.5f) << 16 |
+                        (u8)(cmd->color.b * 255.0f + 0.5f) << 8 | (u8)(cmd->color.a * 255.0f + 0.5f) << 0;
         }
     }
 }
 
-static void render_block(v2 pos,
-                         v2 size,
-                         v4 color,
-                         camera_t *cam,
-                         game_frame_buffer_t *frame_buffer)
+static void render_block(v2 pos, v2 size, v4 color, camera_t *cam, game_frame_buffer_t *frame_buffer)
 {
     f32 units_to_pixels = cam->units_to_pixels;
     f32 frame_width_units = frame_buffer->w / units_to_pixels;
     f32 frame_height_units = frame_buffer->h / units_to_pixels;
-    v2 frame_buffer_half_size =
-        V2(frame_width_units / 2.0f, frame_height_units / 2.0f);
+    v2 frame_buffer_half_size = V2(frame_width_units / 2.0f, frame_height_units / 2.0f);
 
     // Calculate top left and bottom right of block.
     v2 half_size = v2_div(size, 2.0f);
@@ -132,8 +120,7 @@ static void render_block(v2 pos,
     bot_right_corner = v2_mul(bot_right_corner, units_to_pixels);
     v2i top_left_pixel;
     v2i bot_right_pixel;
-    v2_floor2(
-        top_left_corner, bot_right_corner, &top_left_pixel, &bot_right_pixel);
+    v2_floor2(top_left_corner, bot_right_corner, &top_left_pixel, &bot_right_pixel);
 
     // Bounds checking
     if (top_left_pixel.x < 0) {
@@ -160,17 +147,13 @@ static void render_block(v2 pos,
     for (i32 i = top_left_pixel.y; i < bot_right_pixel.y; ++i) {
         u32 *pixels = frame_buffer->data + i * frame_buffer->pitch;
         for (i32 j = top_left_pixel.x; j < bot_right_pixel.x; ++j) {
-            pixels[j] = (u8)(color.r * 255.0f + 0.5f) << 24 |
-                        (u8)(color.g * 255.0f + 0.5f) << 16 |
-                        (u8)(color.b * 255.0f + 0.5f) << 8 |
-                        (u8)(color.a * 255.0f + 0.5f) << 0;
+            pixels[j] = (u8)(color.r * 255.0f + 0.5f) << 24 | (u8)(color.g * 255.0f + 0.5f) << 16 |
+                        (u8)(color.b * 255.0f + 0.5f) << 8 | (u8)(color.a * 255.0f + 0.5f) << 0;
         }
     }
 }
 
-static void render_rotated_block(render_cmd_block_t *cmd,
-                                 camera_t *cam,
-                                 game_frame_buffer_t *frame_buffer)
+static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer)
 {
     render_basis_t basis = cmd->header.basis;
 
@@ -188,19 +171,12 @@ static void render_rotated_block(render_cmd_block_t *cmd,
     // NOTE(Wes): Find the max rect we could possible draw in regardless
     // of rotation.
     v2i floor_bounds[4];
-    v2_floor2(
-        origin, v2_add(origin, x_axis), &floor_bounds[0], &floor_bounds[1]);
-    v2_floor2(v2_add(origin, y_axis),
-              v2_add(v2_add(origin, y_axis), x_axis),
-              &floor_bounds[2],
-              &floor_bounds[3]);
+    v2_floor2(origin, v2_add(origin, x_axis), &floor_bounds[0], &floor_bounds[1]);
+    v2_floor2(v2_add(origin, y_axis), v2_add(v2_add(origin, y_axis), x_axis), &floor_bounds[2], &floor_bounds[3]);
 
     v2i ceil_bounds[4];
     v2_ceil2(origin, v2_add(origin, x_axis), &ceil_bounds[0], &ceil_bounds[1]);
-    v2_ceil2(v2_add(origin, y_axis),
-             v2_add(v2_add(origin, y_axis), x_axis),
-             &ceil_bounds[2],
-             &ceil_bounds[3]);
+    v2_ceil2(v2_add(origin, y_axis), v2_add(v2_add(origin, y_axis), x_axis), &ceil_bounds[2], &ceil_bounds[3]);
 
     for (u32 i = 0; i < 4; ++i) {
         v2i floor_bound = floor_bounds[i];
@@ -237,6 +213,7 @@ static void render_rotated_block(render_cmd_block_t *cmd,
     f32 inv_y_len_sq = 1.0f / v2_len_sq(y_axis);
 
     image_t *texture = cmd->image;
+    image_t *normals = cmd->normals;
     v4 tint = cmd->tint;
 
     u32 *fb_data = frame_buffer->data;
@@ -280,6 +257,31 @@ static void render_rotated_block(render_cmd_block_t *cmd,
 
                 u32 *texel = &texture->data[texture_y * texture->w + texture_x];
 
+                // TODO(Wes): Do this for each light!
+                u32 *normal255 = &normals->data[texture_y * texture->w + texture_x];
+                v3 normal = read_image_color(*normal255).rgb;
+
+                // Convert the normal from the range 0,1 to -1,1
+                normal = v3_sub(v3_mul(normal, 2.0f), V3(1.0f, 1.0f, 1.0f));
+                normal = v3_normalize(normal);
+                light_t *light = &cmd->lights[0];
+
+                v3 light_pos = v3_mul(light->position, cam->units_to_pixels);
+                v3 light_dir = v3_sub(light_pos, V3(x, y, 0.0f));
+                f32 light_distance = v3_len(light_dir);
+                light_dir = v3_normalize(light_dir);
+
+                f32 light_factor = v3_dot(normal, light_dir);
+                v3 ambient_color = v3_mul(light->ambient.rgb, light->ambient.a);
+                v3 light_color = v3_mul(light->color.rgb, light->color.a);
+                v3 diffuse = v3_mul(light_color, kmax(light_factor, 0.0f));
+
+                f32 attenuation =
+                    1.0f / ((light->constant_attentuation) + (light->linear_attenuation * light_distance) +
+                            (light->quadratic_attenuation * light_distance * light_distance));
+
+                v3 light_intensity = v3_mul(v3_add(diffuse, ambient_color), attenuation);
+
                 // NOTE(Wes): Blend the closest 4 texels for better looking
                 // pixels. Bilinear blending.
                 v4 texel_a = read_image_color(*texel);
@@ -296,9 +298,7 @@ static void render_rotated_block(render_cmd_block_t *cmd,
                 texel_d = srgb_to_linear(texel_d);
 
                 v4 blended_color =
-                    v4_lerp(v4_lerp(texel_a, texel_b, fraction_x),
-                            v4_lerp(texel_c, texel_d, fraction_x),
-                            fraction_y);
+                    v4_lerp(v4_lerp(texel_a, texel_b, fraction_x), v4_lerp(texel_c, texel_d, fraction_x), fraction_y);
 
                 u32 *fb_pixel = &fb_data[x + y * frame_buffer->w];
                 v4 dest_color = read_frame_buffer_color(*fb_pixel);
@@ -306,6 +306,7 @@ static void render_rotated_block(render_cmd_block_t *cmd,
                 dest_color = srgb_to_linear(dest_color);
                 dest_color = linear_blend(blended_color, tint, dest_color);
                 dest_color = linear_to_srgb(dest_color);
+                dest_color.rgb = v3_hadamard(dest_color.rgb, light_intensity);
 
                 *fb_pixel = color_frame_buffer_u32(dest_color);
             }
@@ -313,15 +314,12 @@ static void render_rotated_block(render_cmd_block_t *cmd,
     }
 }
 
-static void render_image(render_cmd_image_t *cmd,
-                         camera_t *cam,
-                         game_frame_buffer_t *frame_buffer)
+static void render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer)
 {
     f32 units_to_pixels = cam->units_to_pixels;
     f32 frame_width_units = frame_buffer->w / units_to_pixels;
     f32 frame_height_units = frame_buffer->h / units_to_pixels;
-    v2 frame_buffer_half_size =
-        V2(frame_width_units / 2.0f, frame_height_units / 2.0f);
+    v2 frame_buffer_half_size = V2(frame_width_units / 2.0f, frame_height_units / 2.0f);
 
     // Resizing ratio.
     v2 actual_size;
@@ -345,8 +343,7 @@ static void render_image(render_cmd_image_t *cmd,
     bot_right_corner = v2_mul(bot_right_corner, units_to_pixels);
     v2i top_left_pixel;
     v2i bot_right_pixel;
-    v2_floor2(
-        top_left_corner, bot_right_corner, &top_left_pixel, &bot_right_pixel);
+    v2_floor2(top_left_corner, bot_right_corner, &top_left_pixel, &bot_right_pixel);
 
     // Bounds checking
     i32 image_data_offset_x = -top_left_pixel.x;
@@ -377,8 +374,7 @@ static void render_image(render_cmd_image_t *cmd,
             u32 sample_y = (i + image_data_offset_y) * y_ratio;
             for (i32 j = top_left_pixel.x; j < bot_right_pixel.x; ++j) {
                 u32 sample_x = (flipped_image_data_offset_x - j) * x_ratio;
-                u32 color =
-                    cmd->image->data[sample_x + sample_y * cmd->image->w];
+                u32 color = cmd->image->data[sample_x + sample_y * cmd->image->w];
                 u32 *dest = &frame_buffer->data[j + i * frame_buffer->w];
                 linear_blend_texel(color, dest);
             }
@@ -388,8 +384,7 @@ static void render_image(render_cmd_image_t *cmd,
             u32 sample_y = (i + image_data_offset_y) * y_ratio;
             for (i32 j = top_left_pixel.x; j < bot_right_pixel.x; ++j) {
                 u32 sample_x = (j + image_data_offset_x) * x_ratio;
-                u32 color =
-                    cmd->image->data[sample_x + sample_y * cmd->image->w];
+                u32 color = cmd->image->data[sample_x + sample_y * cmd->image->w];
                 u32 *dest = &frame_buffer->data[j + i * frame_buffer->w];
                 linear_blend_texel(color, dest);
             }
@@ -411,16 +406,14 @@ void *render_push_cmd(render_queue_t *queue, u32 size)
 
 void render_push_clear(render_queue_t *queue, v4 color)
 {
-    render_cmd_clear_t *cmd = (render_cmd_clear_t *)render_push_cmd(
-        queue, sizeof(render_cmd_clear_t));
+    render_cmd_clear_t *cmd = (render_cmd_clear_t *)render_push_cmd(queue, sizeof(render_cmd_clear_t));
     cmd->header.type = render_type_clear;
     cmd->color = color;
 }
 
 void render_push_block(render_queue_t *queue, v2 pos, v2 size, v4 tint)
 {
-    render_cmd_block_t *cmd = (render_cmd_block_t *)render_push_cmd(
-        queue, sizeof(render_cmd_block_t));
+    render_cmd_block_t *cmd = (render_cmd_block_t *)render_push_cmd(queue, sizeof(render_cmd_block_t));
     cmd->header.type = render_type_block;
     cmd->pos = pos;
     cmd->size = size;
@@ -431,25 +424,25 @@ void render_push_rotated_block(render_queue_t *queue,
                                render_basis_t *basis,
                                v2 size,
                                v4 tint,
-                               image_t *image)
+                               image_t *image,
+                               image_t *normals,
+                               light_t *lights,
+                               int num_lights)
 {
-    render_cmd_block_t *cmd = (render_cmd_block_t *)render_push_cmd(
-        queue, sizeof(render_cmd_block_t));
+    render_cmd_block_t *cmd = (render_cmd_block_t *)render_push_cmd(queue, sizeof(render_cmd_block_t));
     cmd->header.type = render_type_rotated_block;
     cmd->header.basis = *basis;
     cmd->size = size;
     cmd->tint = tint;
     cmd->image = image;
+    cmd->normals = normals;
+    cmd->lights = lights;
+    cmd->num_lights = num_lights;
 }
 
-void render_push_image(render_queue_t *queue,
-                       v2 pos,
-                       v2 size,
-                       image_t *image,
-                       b8 flip_x)
+void render_push_image(render_queue_t *queue, v2 pos, v2 size, image_t *image, b8 flip_x)
 {
-    render_cmd_image_t *cmd = (render_cmd_image_t *)render_push_cmd(
-        queue, sizeof(render_cmd_image_t));
+    render_cmd_image_t *cmd = (render_cmd_image_t *)render_push_cmd(queue, sizeof(render_cmd_image_t));
     cmd->header.type = render_type_image;
     cmd->pos = pos;
     cmd->size = size;
@@ -457,9 +450,7 @@ void render_push_image(render_queue_t *queue,
     cmd->flip_x = flip_x;
 }
 
-render_queue_t *render_alloc_queue(memory_arena_t *arena,
-                                   u32 max_render_queue_size,
-                                   camera_t *cam)
+render_queue_t *render_alloc_queue(memory_arena_t *arena, u32 max_render_queue_size, camera_t *cam)
 {
     render_queue_t *queue = push_struct(arena, render_queue_t);
     queue->size = max_render_queue_size;
@@ -472,8 +463,7 @@ render_queue_t *render_alloc_queue(memory_arena_t *arena,
 void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer)
 {
     for (u32 address = 0; address < queue->index;) {
-        render_cmd_header_t *header =
-            (render_cmd_header_t *)(queue->base + address);
+        render_cmd_header_t *header = (render_cmd_header_t *)(queue->base + address);
         switch (header->type) {
         case render_type_clear:
             render_clear((render_cmd_clear_t *)header, frame_buffer);
@@ -481,18 +471,15 @@ void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer)
             break;
         case render_type_block: {
             render_cmd_block_t *cmd = (render_cmd_block_t *)header;
-            render_block(
-                cmd->pos, cmd->size, cmd->tint, queue->camera, frame_buffer);
+            render_block(cmd->pos, cmd->size, cmd->tint, queue->camera, frame_buffer);
             address += sizeof(render_cmd_block_t);
         } break;
         case render_type_rotated_block:
-            render_rotated_block(
-                (render_cmd_block_t *)header, queue->camera, frame_buffer);
+            render_rotated_block((render_cmd_block_t *)header, queue->camera, frame_buffer);
             address += sizeof(render_cmd_block_t);
             break;
         case render_type_image:
-            render_image(
-                (render_cmd_image_t *)header, queue->camera, frame_buffer);
+            render_image((render_cmd_image_t *)header, queue->camera, frame_buffer);
             address += sizeof(render_cmd_image_t);
             break;
         }

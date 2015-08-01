@@ -53,3 +53,8 @@ static inline f32 ksqrt(f32 a)
 {
     return sqrtf(a);
 }
+
+static inline f32 kmax(f32 a, f32 b)
+{
+    return a > b ? a : b;
+}

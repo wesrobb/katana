@@ -44,8 +44,7 @@ typedef struct {
     b8 did_intersect;
 } ray_cast_result;
 
-static ray_cast_result
-ray_cast_vertical(v2 origin, f32 end_y, tilemap_t *tilemap)
+static ray_cast_result ray_cast_vertical(v2 origin, f32 end_y, tilemap_t *tilemap)
 {
     ray_cast_result result;
     f32 tile_width = tilemap->tile_size.x;
@@ -75,8 +74,7 @@ ray_cast_vertical(v2 origin, f32 end_y, tilemap_t *tilemap)
     return result;
 }
 
-static ray_cast_result
-ray_cast_horizontal(v2 origin, f32 end_x, tilemap_t *tilemap)
+static ray_cast_result ray_cast_horizontal(v2 origin, f32 end_x, tilemap_t *tilemap)
 {
     ray_cast_result result;
     f32 tile_width = tilemap->tile_size.x;
@@ -149,15 +147,12 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
             }
 
             // Throw teleporter
-            if (controller->right_shoulder.ended_down &&
-                entity->type == entity_type_player &&
+            if (controller->right_shoulder.ended_down && entity->type == entity_type_player &&
                 !entity->player.teleporter_index) {
-                entity->player.teleporter_index =
-                    get_next_entity(world->entities);
+                entity->player.teleporter_index = get_next_entity(world->entities);
                 u32 teleporter_index = entity->player.teleporter_index;
                 if (teleporter_index != 0) {
-                    entity_t *teleporter_entity =
-                        &world->entities[teleporter_index];
+                    entity_t *teleporter_entity = &world->entities[teleporter_index];
                     teleporter_entity->type = entity_type_teleporter;
                     teleporter_entity->position = entity->position;
                     teleporter_entity->velocity = entity->velocity;
@@ -165,13 +160,11 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
                     teleporter_entity->size.y = 2.0f;
                     teleporter_entity->velocity_factor = -2.0f;
                     teleporter_entity->acceleration_factor = 100.0f;
-                    teleporter_entity->teleporter.image =
-                        &game_state->green_teleporter;
+                    teleporter_entity->teleporter.image = &game_state->green_teleporter;
                     v2 left_stick;
                     left_stick.x = controller->left_stick_x;
                     left_stick.y = controller->left_stick_y;
-                    teleporter_entity->velocity = v2_mul(
-                        left_stick, teleporter_entity->acceleration_factor);
+                    teleporter_entity->velocity = v2_mul(left_stick, teleporter_entity->acceleration_factor);
                     // f32 acceleration_factor = 150.0f;
                     // new_accels[entity->teleporter_index]
                     // =
@@ -181,18 +174,15 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
             }
 
             // Attack
-            if (controller->action_right.ended_down &&
-                entity->type == entity_type_player &&
+            if (controller->action_right.ended_down && entity->type == entity_type_player &&
                 !entity->player.attacking) {
                 entity->player.attacking = 1;
             }
 
             // Teleport
-            if (controller->left_shoulder.ended_down &&
-                entity->type == entity_type_player &&
+            if (controller->left_shoulder.ended_down && entity->type == entity_type_player &&
                 entity->player.teleporter_index) {
-                entity_t *teleporter_entity =
-                    &world->entities[entity->player.teleporter_index];
+                entity_t *teleporter_entity = &world->entities[entity->player.teleporter_index];
                 entity->position = teleporter_entity->position;
                 free_entity(world->entities, entity->player.teleporter_index);
                 entity->player.teleporter_index = 0;
@@ -210,8 +200,7 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
                     left_stick.x = 1.0f;
                 }
             }
-            new_accels[entity_index] =
-                v2_mul(left_stick, entity->acceleration_factor);
+            new_accels[entity_index] = v2_mul(left_stick, entity->acceleration_factor);
         }
     }
 
@@ -247,13 +236,10 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
 
         // Velocity verlet integration.
         v2 average_accel = v2_div(v2_add(entity->acceleration, new_accel), 2);
-        v2 new_entity_pos = v2_mul(v2_mul(entity->acceleration, 0.5f),
-                                   input->delta_time * input->delta_time);
-        new_entity_pos =
-            v2_add(v2_mul(entity->velocity, input->delta_time), new_entity_pos);
+        v2 new_entity_pos = v2_mul(v2_mul(entity->acceleration, 0.5f), input->delta_time * input->delta_time);
+        new_entity_pos = v2_add(v2_mul(entity->velocity, input->delta_time), new_entity_pos);
         new_entity_pos = v2_add(entity->position, new_entity_pos);
-        entity->velocity =
-            v2_add(v2_mul(average_accel, input->delta_time), entity->velocity);
+        entity->velocity = v2_add(v2_mul(average_accel, input->delta_time), entity->velocity);
         entity->acceleration = new_accel;
 
         // Get the movement direction as -1 = left/up, 0 = unused, 1 =
@@ -264,21 +250,16 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         f32 cast_x = half_entity_size.x * move_dir.x;
         v2 top_origin;
         top_origin.x = entity->position.x + cast_x;
-        top_origin.y =
-            entity->position.y - half_entity_size.y + collision_buffer;
+        top_origin.y = entity->position.y - half_entity_size.y + collision_buffer;
         v2 bot_origin;
         bot_origin.x = top_origin.x;
-        bot_origin.y =
-            entity->position.y + half_entity_size.y - collision_buffer;
+        bot_origin.y = entity->position.y + half_entity_size.y - collision_buffer;
 
         f32 end_x = new_entity_pos.x + cast_x;
-        ray_cast_result intersect_x1 =
-            ray_cast_horizontal(top_origin, end_x, &world->tilemap);
-        ray_cast_result intersect_x2 =
-            ray_cast_horizontal(bot_origin, end_x, &world->tilemap);
+        ray_cast_result intersect_x1 = ray_cast_horizontal(top_origin, end_x, &world->tilemap);
+        ray_cast_result intersect_x2 = ray_cast_horizontal(bot_origin, end_x, &world->tilemap);
 
-        if ((move_dir.x * intersect_x1.intersect) <=
-            (move_dir.x * intersect_x2.intersect)) {
+        if ((move_dir.x * intersect_x1.intersect) <= (move_dir.x * intersect_x2.intersect)) {
             entity->position.x = intersect_x1.intersect - cast_x;
         } else {
             entity->position.x = intersect_x2.intersect - cast_x;
@@ -292,22 +273,17 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         // Vertical collision check.
         f32 cast_y = half_entity_size.y * move_dir.y;
         v2 left_origin;
-        left_origin.x =
-            entity->position.x - half_entity_size.x + collision_buffer;
+        left_origin.x = entity->position.x - half_entity_size.x + collision_buffer;
         left_origin.y = entity->position.y + cast_y;
         v2 right_origin;
-        right_origin.x =
-            entity->position.x + half_entity_size.x - collision_buffer;
+        right_origin.x = entity->position.x + half_entity_size.x - collision_buffer;
         right_origin.y = left_origin.y;
 
         f32 end_y = new_entity_pos.y + cast_y;
-        ray_cast_result intersect_y1 =
-            ray_cast_vertical(left_origin, end_y, &world->tilemap);
-        ray_cast_result intersect_y2 =
-            ray_cast_vertical(right_origin, end_y, &world->tilemap);
+        ray_cast_result intersect_y1 = ray_cast_vertical(left_origin, end_y, &world->tilemap);
+        ray_cast_result intersect_y2 = ray_cast_vertical(right_origin, end_y, &world->tilemap);
 
-        if ((move_dir.y * intersect_y1.intersect) <=
-            (move_dir.y * intersect_y2.intersect)) {
+        if ((move_dir.y * intersect_y1.intersect) <= (move_dir.y * intersect_y2.intersect)) {
             entity->position.y = intersect_y1.intersect - cast_y;
         } else {
             entity->position.y = intersect_y2.intersect - cast_y;
@@ -326,8 +302,7 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         }
 
         // Track entity positions for the camera
-        if (entity->type == entity_type_player ||
-            entity->type == entity_type_teleporter) {
+        if (entity->type == entity_type_player || entity->type == entity_type_teleporter) {
             game_state->world.camera_tracked_positions[i] = entity->position;
         }
 
@@ -336,17 +311,14 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         if (entity->type == entity_type_player && entity->player.attacking) {
             for (u32 j = 1; j < KATANA_MAX_ENTITIES; ++j) {
                 entity_t *other_player = &world->entities[j];
-                if (i == j || !other_player->exists ||
-                    other_player->type != entity_type_player) {
+                if (i == j || !other_player->exists || other_player->type != entity_type_player) {
                     continue;
                 }
                 v2 katana_pos;
                 if (entity->velocity.x > 0) {
-                    katana_pos =
-                        v2_add(entity->position, entity->player.katana_offset);
+                    katana_pos = v2_add(entity->position, entity->player.katana_offset);
                 } else {
-                    katana_pos =
-                        v2_sub(entity->position, entity->player.katana_offset);
+                    katana_pos = v2_sub(entity->position, entity->player.katana_offset);
                 }
                 v2 player_pos = other_player->position;
                 v2 player_half_size = v2_div(other_player->size, 2.0f);
@@ -362,9 +334,7 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
 
                     other_player->exists = 0;
                     if (other_player->player.teleporter_index) {
-                        entity_t *other_teleporter =
-                            &world->entities[other_player->player
-                                                 .teleporter_index];
+                        entity_t *other_teleporter = &world->entities[other_player->player.teleporter_index];
                         if (other_teleporter->exists) {
                             other_teleporter->exists = 0;
                             other_teleporter->player.teleporter_index = 0;
@@ -383,12 +353,8 @@ static image_t load_image(const char *path, map_file_fn map_file)
     mapped_file_t mapped_file = map_file(path);
     int unused = 0;
     int required_components = 4; // We always want RGBA.
-    result.data = (u32 *)stbi_load_from_memory(mapped_file.contents,
-                                               mapped_file.size,
-                                               (int *)&result.w,
-                                               (int *)&result.h,
-                                               &unused,
-                                               required_components);
+    result.data = (u32 *)stbi_load_from_memory(
+        mapped_file.contents, mapped_file.size, (int *)&result.w, (int *)&result.h, &unused, required_components);
 
     // NOTE(Wes): Pre-multiply alpha.
     for (u32 y = 0; y < result.h; y++) {
@@ -437,582 +403,24 @@ void game_update_and_render(game_memory_t *memory,
         game_state->t_sine = 0.0f;
         game_state->tone_hz = 512;
         static unsigned char tilemap[18][32] = {
-            {1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1},
-            {1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1,
-             1,
-             1,
-             1,
-             1,
-             0,
-             0,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1,
-             0,
-             0,
-             1},
-            {1,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             0,
-             1,
-             0,
-             0,
-             1},
-            {1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1,
-             1},
+            {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+            {1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
+            {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
+            {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
         };
         unsigned char *tile = game_state->world.tilemap.tiles;
         for (u32 y = 0; y < 18; ++y) {
@@ -1026,53 +434,33 @@ void game_update_and_render(game_memory_t *memory,
         game_state->world.tilemap.tiles_wide = 32;
         game_state->world.tilemap.tiles_high = 18;
 
-        game_state->test_image =
-            load_image("data/test_image.png", callbacks->map_file);
-        game_state->test_image2 =
-            load_image("data/test_image2.png", callbacks->map_file);
-        game_state->test_image3 =
-            load_image("data/test_image3.png", callbacks->map_file);
-        game_state->background_image =
-            load_image("data/background/Bg 1.png", callbacks->map_file);
-        game_state->tile_image =
-            load_image("data/tiles/Box 01.png", callbacks->map_file);
-        game_state->player_images[0] = load_image(
-            "data/player/walk_with_sword/1.png", callbacks->map_file);
-        game_state->player_images[1] = load_image(
-            "data/player/walk_with_sword/2.png", callbacks->map_file);
-        game_state->player_images[2] = load_image(
-            "data/player/walk_with_sword/3.png", callbacks->map_file);
-        game_state->player_images[3] = load_image(
-            "data/player/walk_with_sword/4.png", callbacks->map_file);
-        game_state->player_images[4] = load_image(
-            "data/player/walk_with_sword/5.png", callbacks->map_file);
-        game_state->player_images[5] = load_image(
-            "data/player/walk_with_sword/6.png", callbacks->map_file);
-        game_state->player_attack_images[0] = load_image(
-            "data/player/attack_with_sword/1.png", callbacks->map_file);
-        game_state->player_attack_images[1] = load_image(
-            "data/player/attack_with_sword/2.png", callbacks->map_file);
-        game_state->player_attack_images[2] = load_image(
-            "data/player/attack_with_sword/3.png", callbacks->map_file);
-        game_state->player_attack_images[3] = load_image(
-            "data/player/attack_with_sword/4.png", callbacks->map_file);
-        game_state->player_attack_images[4] = load_image(
-            "data/player/attack_with_sword/5.png", callbacks->map_file);
-        game_state->player_attack_images[5] = load_image(
-            "data/player/attack_with_sword/6.png", callbacks->map_file);
-        game_state->green_teleporter =
-            load_image("data/teleporter/green.png", callbacks->map_file);
+        game_state->test_image = load_image("data/test_image.png", callbacks->map_file);
+        game_state->test_image2 = load_image("data/test_image2.png", callbacks->map_file);
+        game_state->test_image3 = load_image("data/test_image3.png", callbacks->map_file);
+        game_state->background_image = load_image("data/background/Bg 1.png", callbacks->map_file);
+        game_state->tile_image = load_image("data/tiles/Box 01.png", callbacks->map_file);
+        game_state->player_images[0] = load_image("data/player/walk_with_sword/1.png", callbacks->map_file);
+        game_state->player_images[1] = load_image("data/player/walk_with_sword/2.png", callbacks->map_file);
+        game_state->player_images[2] = load_image("data/player/walk_with_sword/3.png", callbacks->map_file);
+        game_state->player_images[3] = load_image("data/player/walk_with_sword/4.png", callbacks->map_file);
+        game_state->player_images[4] = load_image("data/player/walk_with_sword/5.png", callbacks->map_file);
+        game_state->player_images[5] = load_image("data/player/walk_with_sword/6.png", callbacks->map_file);
+        game_state->player_normal = load_image("data/player/walk_with_sword/1_nrm.png", callbacks->map_file);
+        game_state->player_attack_images[0] = load_image("data/player/attack_with_sword/1.png", callbacks->map_file);
+        game_state->player_attack_images[1] = load_image("data/player/attack_with_sword/2.png", callbacks->map_file);
+        game_state->player_attack_images[2] = load_image("data/player/attack_with_sword/3.png", callbacks->map_file);
+        game_state->player_attack_images[3] = load_image("data/player/attack_with_sword/4.png", callbacks->map_file);
+        game_state->player_attack_images[4] = load_image("data/player/attack_with_sword/5.png", callbacks->map_file);
+        game_state->player_attack_images[5] = load_image("data/player/attack_with_sword/6.png", callbacks->map_file);
+        game_state->green_teleporter = load_image("data/teleporter/green.png", callbacks->map_file);
 
         init_arena(&game_state->arena,
                    memory->permanent_store_size - sizeof(game_state_t),
                    memory->permanent_store + sizeof(game_state_t));
-        init_arena(&game_state->frame_arena,
-                   memory->transient_store_size,
-                   memory->transient_store);
+        init_arena(&game_state->frame_arena, memory->transient_store_size, memory->transient_store);
 
         // TODO(Wes): This breaks the hot reloading. Fix it.
-        game_state->render_queue = render_alloc_queue(
-            &game_state->frame_arena, 10000, &game_state->world.camera);
+        game_state->render_queue = render_alloc_queue(&game_state->frame_arena, 10000, &game_state->world.camera);
 
         memory->is_initialized = 1;
     }
@@ -1136,11 +524,8 @@ void game_update_and_render(game_memory_t *memory,
     // This should be removed sometime.
     min_pos = V2(0, 0);
     tilemap_t *tilemap = &game_state->world.tilemap;
-    max_pos = V2(tilemap->tile_size.x * tilemap->tiles_wide,
-                 tilemap->tile_size.y * tilemap->tiles_high);
-    memset(game_state->world.camera_tracked_positions,
-           0,
-           KATANA_MAX_ENTITIES * sizeof(v2));
+    max_pos = V2(tilemap->tile_size.x * tilemap->tiles_wide, tilemap->tile_size.y * tilemap->tiles_high);
+    memset(game_state->world.camera_tracked_positions, 0, KATANA_MAX_ENTITIES * sizeof(v2));
 
     v2 camera_edge_buffer = V2(0.0f, 0.0f);
     min_pos = v2_sub(min_pos, camera_edge_buffer);
@@ -1149,24 +534,20 @@ void game_update_and_render(game_memory_t *memory,
 
     f32 cam_move_speed = 4.0f;
     game_state->world.camera.position =
-        v2_add(v2_mul(game_state->world.camera.position,
-                      (1.0f - (input->delta_time * cam_move_speed))),
+        v2_add(v2_mul(game_state->world.camera.position, (1.0f - (input->delta_time * cam_move_speed))),
                v2_mul(new_camera_pos, (input->delta_time * cam_move_speed)));
 
     v2 screen_span = v2_sub(v2_add(max_pos, camera_edge_buffer), min_pos);
     f32 x_units_to_pixels = frame_buffer->w / screen_span.x;
     f32 y_units_to_pixels = frame_buffer->h / screen_span.y;
 
-    f32 units_to_pixels = x_units_to_pixels < y_units_to_pixels
-                              ? x_units_to_pixels
-                              : y_units_to_pixels;
+    f32 units_to_pixels = x_units_to_pixels < y_units_to_pixels ? x_units_to_pixels : y_units_to_pixels;
     game_state->world.camera.units_to_pixels = units_to_pixels;
 
     // TODO(Wes): Fix camera zoom rounding errors.
     f32 cam_zoom_speed = 0.0f;
     game_state->world.camera.units_to_pixels =
-        (game_state->world.camera.units_to_pixels *
-         (1.0f - (input->delta_time * cam_zoom_speed))) +
+        (game_state->world.camera.units_to_pixels * (1.0f - (input->delta_time * cam_zoom_speed))) +
         (units_to_pixels * (input->delta_time * cam_zoom_speed));
 
 #if 0
@@ -1199,11 +580,7 @@ void game_update_and_render(game_memory_t *memory,
 #if 1
     v2 background_pos = V2(64.0f, 36.0f);
     v2 background_size = V2(128.0f, 72.0f);
-    render_push_image(game_state->render_queue,
-                      background_pos,
-                      background_size,
-                      &game_state->background_image,
-                      0);
+    render_push_image(game_state->render_queue, background_pos, background_size, &game_state->background_image, 0);
     for (u32 i = 0; i < 18; ++i) {
         for (u32 j = 0; j < 32; ++j) {
             if (tilemap->tiles[j + i * tilemap->tiles_wide]) {
@@ -1212,11 +589,8 @@ void game_update_and_render(game_memory_t *memory,
                 tile_origin.y = i * tilemap->tile_size.y;
                 v2 tile_half_size = v2_div(tilemap->tile_size, 2.0f);
                 tile_origin = v2_add(tile_origin, tile_half_size);
-                render_push_image(game_state->render_queue,
-                                  tile_origin,
-                                  tilemap->tile_size,
-                                  &game_state->tile_image,
-                                  1);
+                render_push_image(
+                    game_state->render_queue, tile_origin, tilemap->tile_size, &game_state->tile_image, 1);
             }
         }
     }
@@ -1236,10 +610,8 @@ void game_update_and_render(game_memory_t *memory,
             entity_anim_t *anim;
             if (entity->player.attacking) {
                 anim = &entity->player.attack;
-                if (anim->accumulator + input->delta_time >=
-                    (1.0f / anim->fps)) {
-                    anim->current_frame =
-                        ++anim->current_frame % anim->max_frames;
+                if (anim->accumulator + input->delta_time >= (1.0f / anim->fps)) {
+                    anim->current_frame = ++anim->current_frame % anim->max_frames;
                     anim->accumulator = 0;
                     // TODO(Wes): This is not a good way to
                     // determine when attack is complete.
@@ -1252,12 +624,9 @@ void game_update_and_render(game_memory_t *memory,
             } else {
                 anim = &entity->player.walk;
                 if (input->controllers[i].left_stick_x != 0.0f) {
-                    f32 anim_fps =
-                        kabsf(input->controllers[i].left_stick_x) * anim->fps;
-                    if (anim->accumulator + input->delta_time >=
-                        (1.0f / anim_fps)) {
-                        anim->current_frame =
-                            ++anim->current_frame % anim->max_frames;
+                    f32 anim_fps = kabsf(input->controllers[i].left_stick_x) * anim->fps;
+                    if (anim->accumulator + input->delta_time >= (1.0f / anim_fps)) {
+                        anim->current_frame = ++anim->current_frame % anim->max_frames;
                         anim->accumulator = 0;
                     } else {
                         anim->accumulator += input->delta_time;
@@ -1267,40 +636,27 @@ void game_update_and_render(game_memory_t *memory,
             v2 draw_offset = V2(0.3f, -0.4f);
             v2 size = V2(8.0f, 5.0f);
             v2 draw_pos = v2_add(entity->position, draw_offset);
-            render_push_image(game_state->render_queue,
-                              draw_pos,
-                              size,
-                              &anim->frames[anim->current_frame],
-                              entity->velocity.x > 0);
+            render_push_image(
+                game_state->render_queue, draw_pos, size, &anim->frames[anim->current_frame], entity->velocity.x > 0);
 
             // Debug drawing for katana point.
             if (entity->player.attacking) {
                 v2 katana_pos;
                 if (entity->velocity.x > 0) {
-                    katana_pos =
-                        v2_add(entity->position, entity->player.katana_offset);
+                    katana_pos = v2_add(entity->position, entity->player.katana_offset);
                 } else {
-                    katana_pos =
-                        v2_sub(entity->position, entity->player.katana_offset);
+                    katana_pos = v2_sub(entity->position, entity->player.katana_offset);
                 }
                 v2 size = V2(1.0f, 1.0f);
-                render_push_block(game_state->render_queue,
-                                  katana_pos,
-                                  size,
-                                  COLOR(1.0f, 1.0f, 1.0f, 1.0f));
+                render_push_block(game_state->render_queue, katana_pos, size, COLOR(1.0f, 1.0f, 1.0f, 1.0f));
             }
         }
 
-        if (entity->type == entity_type_player &&
-            entity->player.teleporter_index) {
-            entity_t *teleporter =
-                &game_state->world.entities[entity->player.teleporter_index];
+        if (entity->type == entity_type_player && entity->player.teleporter_index) {
+            entity_t *teleporter = &game_state->world.entities[entity->player.teleporter_index];
             assert(teleporter->type == entity_type_teleporter);
-            render_push_image(game_state->render_queue,
-                              teleporter->position,
-                              teleporter->size,
-                              teleporter->teleporter.image,
-                              0);
+            render_push_image(
+                game_state->render_queue, teleporter->position, teleporter->size, teleporter->teleporter.image, 0);
         }
     }
 
@@ -1319,11 +675,21 @@ void game_update_and_render(game_memory_t *memory,
     origin = v2_sub(origin, v2_mul(x_axis, 0.5f));
     origin = v2_sub(origin, v2_mul(y_axis, 0.5f));
     render_basis_t basis = {origin, x_axis, y_axis};
+    v4 light_color = V4(1.0f, 1.0f, 1.0f, 1.0f);
+    v3 light_pos = V3(40.0f, 40.0f, 1.0f);
+    v4 ambient = V4(0.6f, 1.0f, 0.6f, 0.2f);
+    f32 constant_attenuation = 1.0f;
+    f32 linear_attenuation = 0.0f;
+    f32 quadratic_attenuation = 0.0f;
+    light_t light = {light_color, light_pos, ambient, constant_attenuation, linear_attenuation, quadratic_attenuation};
     render_push_rotated_block(game_state->render_queue,
                               &basis,
                               V2(2, 2),
                               COLOR(1, 1, 1, 1),
-                              &game_state->player_images[0]);
+                              &game_state->player_images[0],
+                              &game_state->player_normal,
+                              &light,
+                              1);
 
     render_draw_queue(game_state->render_queue, frame_buffer);
 

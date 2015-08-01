@@ -14,12 +14,12 @@ typedef union {
     };
     f32 v[2];
 } v2;
-#define V2(x, y)                                                               \
-    (v2)                                                                       \
-    {                                                                          \
-        {                                                                      \
-            x, y                                                               \
-        }                                                                      \
+#define V2(x, y)                                                                                                       \
+    (v2)                                                                                                               \
+    {                                                                                                                  \
+        {                                                                                                              \
+            x, y                                                                                                       \
+        }                                                                                                              \
     }
 
 typedef union {
@@ -38,12 +38,12 @@ typedef union {
     };
     f32 v[3];
 } v3;
-#define V3(x, y, z)                                                            \
-    (v3)                                                                       \
-    {                                                                          \
-        {                                                                      \
-            x, y, z                                                            \
-        }                                                                      \
+#define V3(x, y, z)                                                                                                    \
+    (v3)                                                                                                               \
+    {                                                                                                                  \
+        {                                                                                                              \
+            x, y, z                                                                                                    \
+        }                                                                                                              \
     }
 
 typedef union {
@@ -75,19 +75,19 @@ typedef union {
     };
     f32 v[4];
 } v4;
-#define V4(x, y, z, w)                                                         \
-    (v4)                                                                       \
-    {                                                                          \
-        {                                                                      \
-            x, y, z, w                                                         \
-        }                                                                      \
+#define V4(x, y, z, w)                                                                                                 \
+    (v4)                                                                                                               \
+    {                                                                                                                  \
+        {                                                                                                              \
+            x, y, z, w                                                                                                 \
+        }                                                                                                              \
     }
-#define COLOR(r, g, b, a)                                                      \
-    (v4)                                                                       \
-    {                                                                          \
-        {                                                                      \
-            r, g, b, a                                                         \
-        }                                                                      \
+#define COLOR(r, g, b, a)                                                                                              \
+    (v4)                                                                                                               \
+    {                                                                                                                  \
+        {                                                                                                              \
+            r, g, b, a                                                                                                 \
+        }                                                                                                              \
     }
 
 // Note(Wes): Memory
@@ -105,8 +105,7 @@ void init_arena(memory_arena_t *arena, u32 size, u8 *base)
 }
 
 #define push_struct(arena, type) (type *) push_size(arena, sizeof(type))
-#define push_array(arena, count, type)                                         \
-    (type *) push_size(arena, (count) * sizeof(type))
+#define push_array(arena, count, type) (type *) push_size(arena, (count) * sizeof(type))
 void *push_size(memory_arena_t *arena, u32 size)
 {
     assert((arena->index + size) <= arena->size);
@@ -184,17 +183,25 @@ typedef struct {
 } camera_t;
 
 typedef struct {
+    v4 color;
+    // Lights have a Z axis so that we know the angle the light hits the normal map.
+    v3 position;
+    v4 ambient; // TODO(Wes): This should not be stored per light.
+
+    // NOTE(Wes): This is the Linear-Constant-Quadratic light fall off.
+    // See https://developer.valvesoftware.com/wiki/Constant-Linear-Quadratic_Falloff for more info.
+    f32 constant_attentuation;
+    f32 linear_attenuation;
+    f32 quadratic_attenuation;
+} light_t;
+
+typedef struct {
     v2 origin;
     v2 x_axis;
     v2 y_axis;
 } render_basis_t;
 
-typedef enum {
-    render_type_clear,
-    render_type_block,
-    render_type_image,
-    render_type_rotated_block
-} render_type_t;
+typedef enum { render_type_clear, render_type_block, render_type_image, render_type_rotated_block } render_type_t;
 
 typedef struct {
     render_type_t type;
@@ -212,6 +219,9 @@ typedef struct {
     v2 size;
     v4 tint;
     image_t *image;
+    image_t *normals;
+    light_t *lights;
+    u32 num_lights;
 } render_cmd_block_t;
 
 typedef struct {
@@ -233,7 +243,7 @@ typedef struct {
 // Note(Wes): Game
 #define KATANA_MAX_ENTITIES 512
 typedef struct {
-    entity_t entities[KATANA_MAX_ENTITIES]; // Entity 0 is the "null" entity
+    entity_t entities[KATANA_MAX_ENTITIES];           // Entity 0 is the "null" entity
     v2 camera_tracked_positions[KATANA_MAX_ENTITIES]; // Camera will
                                                       // always ensure
                                                       // these
@@ -250,6 +260,7 @@ typedef struct {
     image_t background_image;
     image_t tile_image;
     image_t player_images[6];
+    image_t player_normal;
     image_t player_attack_images[6];
     image_t green_teleporter;
     // TODO(Wes): Remove test image.
