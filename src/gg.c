@@ -1,8 +1,7 @@
-#include "katana_types.h"
-#include "katana_intrinsics.h"
-#include "katana_math.h"
-#include "katana_vec.h"
-#include "katana_render.c"
+#include "gg_types.h"
+#include "gg_math.h"
+#include "gg_vec.h"
+#include "gg_render.h"
 
 #define STB_ASSERT(x) assert(x);
 #define STBI_ONLY_PNG
@@ -109,7 +108,7 @@ static ray_cast_result ray_cast_horizontal(v2 origin, f32 end_x, tilemap_t *tile
 static u32 get_next_entity(entity_t *entities)
 {
     static const entity_t zero_entity = {};
-    for (u32 i = 1; i < KATANA_MAX_ENTITIES; ++i) {
+    for (u32 i = 1; i < GG_MAX_ENTITIES; ++i) {
         entity_t *entity = &entities[i];
         if (!entity->exists) {
             *entity = zero_entity;
@@ -124,16 +123,16 @@ static u32 get_next_entity(entity_t *entities)
 static void free_entity(entity_t *entities, u32 index)
 {
     static const entity_t zero_entity = {};
-    assert(index < KATANA_MAX_ENTITIES);
+    assert(index < GG_MAX_ENTITIES);
     entities[index] = zero_entity;
 }
 
 static void update_entities(game_state_t *game_state, game_input_t *input)
 {
     world_t *world = &game_state->world;
-    v2 new_accels[KATANA_MAX_ENTITIES] = {};
+    v2 new_accels[GG_MAX_ENTITIES] = {};
 
-    for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
+    for (u32 i = 0; i < GG_MAX_CONTROLLERS; ++i) {
         u32 entity_index = world->controlled_entities[i];
         if (entity_index != 0) {
             entity_t *entity = &world->entities[entity_index];
@@ -204,7 +203,7 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         }
     }
 
-    for (u32 i = 1; i < KATANA_MAX_ENTITIES; ++i) {
+    for (u32 i = 1; i < GG_MAX_ENTITIES; ++i) {
         entity_t *entity = &world->entities[i];
         if (!entity->exists) {
             continue;
@@ -309,7 +308,7 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         // If this entity is a sword then check if it is currently
         // intersecting with any players
         if (entity->type == entity_type_player && entity->player.attacking) {
-            for (u32 j = 1; j < KATANA_MAX_ENTITIES; ++j) {
+            for (u32 j = 1; j < GG_MAX_ENTITIES; ++j) {
                 entity_t *other_player = &world->entities[j];
                 if (i == j || !other_player->exists || other_player->type != entity_type_player) {
                     continue;
@@ -326,7 +325,7 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
                     player_pos.x + player_half_size.x > katana_pos.x &&
                     player_pos.y - player_half_size.y < katana_pos.y &&
                     player_pos.y + player_half_size.y > katana_pos.y) {
-                    for (u32 k = 0; k < KATANA_MAX_CONTROLLERS; ++k) {
+                    for (u32 k = 0; k < GG_MAX_CONTROLLERS; ++k) {
                         if (world->controlled_entities[k] == j) {
                             world->controlled_entities[k] = 0;
                         }
@@ -466,7 +465,7 @@ void game_update_and_render(game_memory_t *memory,
     }
 
     // NOTE(Wes): Check for controller based entity spawn.
-    for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
+    for (u32 i = 0; i < GG_MAX_CONTROLLERS; ++i) {
         game_controller_input_t *controller = &input->controllers[i];
         u32 controlled_entity = game_state->world.controlled_entities[i];
         if (controller->start.ended_down && !controlled_entity) {
@@ -501,7 +500,7 @@ void game_update_and_render(game_memory_t *memory,
     v2 min_pos = V2(FLT_MAX, FLT_MAX);
     v2 max_pos = V2(FLT_MIN, FLT_MIN);
     b8 tracked_pos_found = 0;
-    for (u32 i = 0; i < KATANA_MAX_ENTITIES; ++i) {
+    for (u32 i = 0; i < GG_MAX_ENTITIES; ++i) {
         v2 tracked_pos = game_state->world.camera_tracked_positions[i];
         if (tracked_pos.x != 0.0f && tracked_pos.y != 0.0f) {
             tracked_pos_found = 1;
@@ -525,7 +524,7 @@ void game_update_and_render(game_memory_t *memory,
     min_pos = V2(0, 0);
     tilemap_t *tilemap = &game_state->world.tilemap;
     max_pos = V2(tilemap->tile_size.x * tilemap->tiles_wide, tilemap->tile_size.y * tilemap->tiles_high);
-    memset(game_state->world.camera_tracked_positions, 0, KATANA_MAX_ENTITIES * sizeof(v2));
+    memset(game_state->world.camera_tracked_positions, 0, GG_MAX_ENTITIES * sizeof(v2));
 
     v2 camera_edge_buffer = V2(0.0f, 0.0f);
     min_pos = v2_sub(min_pos, camera_edge_buffer);
@@ -596,7 +595,7 @@ void game_update_and_render(game_memory_t *memory,
     }
 #endif
 
-    for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
+    for (u32 i = 0; i < GG_MAX_CONTROLLERS; ++i) {
         u32 controlled_entity = game_state->world.controlled_entities[i];
         if (controlled_entity == 0) {
             continue;

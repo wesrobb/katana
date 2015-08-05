@@ -1,4 +1,4 @@
-#include "katana_platform.h"
+#include "gg_platform.h"
 
 #include "SDL.h"
 
@@ -20,8 +20,8 @@
 #define Gigabytes(Value) (Megabytes(Value) * 1024LL)
 #define Terabytes(Value) (Gigabytes(Value) * 1024LL)
 
-SDL_GameController *controller_handles[KATANA_MAX_CONTROLLERS];
-SDL_Haptic *haptic_handles[KATANA_MAX_CONTROLLERS];
+SDL_GameController *controller_handles[GG_MAX_CONTROLLERS];
+SDL_Haptic *haptic_handles[GG_MAX_CONTROLLERS];
 
 typedef void (*game_update_and_render_fn_t)(game_memory_t *,
                                             game_frame_buffer_t *,
@@ -41,7 +41,7 @@ typedef struct {
     game_update_and_render_fn_t update_and_render_fn;
 } osx_game_t;
 
-#define KATANA_MAX_RECORDED_INPUT_EVENTS 6000 // 100 seconds of input at 60fps
+#define GG_MAX_RECORDED_INPUT_EVENTS 6000 // 100 seconds of input at 60fps
 typedef struct {
     game_input_t *input_events;
     u32 input_record_index;
@@ -72,11 +72,11 @@ static osx_game_so_paths_t osx_get_game_so_paths()
 
     static char so_path[1024] = {0};
     strncpy(so_path, real_exe_path, last_slash + 1);
-    strcat(so_path, "katana.so");
+    strcat(so_path, "gg.so");
 
     static char temp_so_path[1024] = {0};
     strncpy(temp_so_path, real_exe_path, last_slash + 1);
-    strcat(temp_so_path, "katana_temp.so");
+    strcat(temp_so_path, "gg_temp.so");
 
     osx_game_so_paths_t game_so_paths;
     game_so_paths.so = so_path;
@@ -158,7 +158,7 @@ static f32 osx_process_controller_axis(i16 stick_value, i16 dead_zone_threshold)
 static void osx_handle_controller_input(game_input_t *new_input,
                                         game_input_t *old_input)
 {
-    for (int i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
+    for (int i = 0; i < GG_MAX_CONTROLLERS; ++i) {
         if (!SDL_GameControllerGetAttached(controller_handles[i])) {
             continue;
         }
@@ -428,7 +428,7 @@ int main(void)
         if (!SDL_IsGameController(i)) {
             continue;
         }
-        if (i >= KATANA_MAX_CONTROLLERS) {
+        if (i >= GG_MAX_CONTROLLERS) {
             break;
         }
         SDL_GameController *controller = SDL_GameControllerOpen(i);
@@ -465,7 +465,7 @@ int main(void)
     osx_game_record_t game_record = {};
     game_record.input_events =
         mmap(0,
-             sizeof(game_input_t) * KATANA_MAX_RECORDED_INPUT_EVENTS,
+             sizeof(game_input_t) * GG_MAX_RECORDED_INPUT_EVENTS,
              PROT_READ | PROT_WRITE,
              MAP_ANON | MAP_PRIVATE,
              -1,
@@ -479,7 +479,7 @@ int main(void)
     u64 last_time = SDL_GetPerformanceCounter();
     u64 perf_freq = SDL_GetPerformanceFrequency();
     i32 frame_counter = 0;
-    f32 frame_sec = 1.0f / KATANA_TARGET_FPS;
+    f32 frame_sec = 1.0f / GG_TARGET_FPS;
     SDL_Event event;
     b8 recording = false;
     b8 playing_back = false;
@@ -538,7 +538,7 @@ int main(void)
         time_t last_modified = osx_get_last_modified(game_so_paths.so);
         if (difftime(last_modified, game.so_last_modified) != 0) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "katana.so modified - Reloading");
+                        "gg.so modified - Reloading");
             dlclose(game.so);
             copyfile(game_so_paths.so, game_so_paths.temp_so, 0, COPYFILE_ALL);
             osx_load_game(&game, game_so_paths.temp_so);
@@ -585,7 +585,7 @@ int main(void)
         // sizeof(i16));
         // u32 queued_audio_size = SDL_GetQueuedAudioSize(audio_device);
 
-        for (u32 i = 0; i < KATANA_MAX_CONTROLLERS; ++i) {
+        for (u32 i = 0; i < GG_MAX_CONTROLLERS; ++i) {
             if (!haptic_handles[i]) {
                 continue;
             }

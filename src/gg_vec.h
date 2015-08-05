@@ -1,7 +1,95 @@
 #pragma once
 
-#include "katana_types.h"
-#include "katana_intrinsics.h"
+#include "gg_platform.h"
+#include "gg_math.h"
+
+// Note(Wes): Vectors
+typedef struct {
+    i32 x;
+    i32 y;
+} v2i;
+
+typedef union {
+    struct {
+        f32 x, y;
+    };
+    f32 v[2];
+} v2;
+#define V2(x, y)                                                                                                       \
+    (v2)                                                                                                               \
+    {                                                                                                                  \
+        {                                                                                                              \
+            x, y                                                                                                       \
+        }                                                                                                              \
+    }
+
+typedef union {
+    struct {
+        f32 x, y, z;
+    };
+    struct {
+        f32 r, g, b;
+    };
+    struct {
+        v2 xy;
+    };
+    struct {
+        f32 x_;
+        v2 yz;
+    };
+    f32 v[3];
+} v3;
+#define V3(x, y, z)                                                                                                    \
+    (v3)                                                                                                               \
+    {                                                                                                                  \
+        {                                                                                                              \
+            x, y, z                                                                                                    \
+        }                                                                                                              \
+    }
+
+typedef union {
+    struct {
+        f32 x, y, z, w;
+    };
+    struct {
+        f32 r, g, b, a;
+    };
+    struct {
+        v2 xy, zw;
+    };
+    struct {
+        v3 xyz;
+        f32 w_;
+    };
+    struct {
+        v3 rgb;
+        f32 a_;
+    };
+    struct {
+        f32 x_;
+        v3 yzw;
+    };
+    struct {
+        f32 x__;
+        v2 yz;
+        f32 w__;
+    };
+    f32 v[4];
+} v4;
+#define V4(x, y, z, w)                                                                                                 \
+    (v4)                                                                                                               \
+    {                                                                                                                  \
+        {                                                                                                              \
+            x, y, z, w                                                                                                 \
+        }                                                                                                              \
+    }
+#define COLOR(r, g, b, a)                                                                                              \
+    (v4)                                                                                                               \
+    {                                                                                                                  \
+        {                                                                                                              \
+            r, g, b, a                                                                                                 \
+        }                                                                                                              \
+    }
 
 static inline v2 v2_add(v2 a, v2 b)
 {

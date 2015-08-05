@@ -2,9 +2,9 @@
 
 #include <stdint.h>
 
-#define KATANA_TARGET_FPS 60
+#define GG_TARGET_FPS 60
 
-#if KATANA_DEBUG
+#if GG_DEBUG
 #define assert(Expression)                                                     \
     if (!(Expression)) {                                                       \
         *(volatile int *)0 = 0;                                                \
@@ -86,14 +86,14 @@ typedef struct {
     };
 } game_controller_input_t;
 
-#define KATANA_MAX_CONTROLLERS 4
+#define GG_MAX_CONTROLLERS 4
 typedef struct {
     game_button_state_t mouse_buttons[5];
     i32 mouse_x;
     i32 mouse_y;
     i32 mouse_z;
 
-    game_controller_input_t controllers[KATANA_MAX_CONTROLLERS];
+    game_controller_input_t controllers[GG_MAX_CONTROLLERS];
 
     f32 delta_time;
 } game_input_t;
@@ -103,15 +103,15 @@ typedef struct {
     f32 intensity;
 } game_controller_output_t;
 
-#define KATANA_MAX_AUDIO_SAMPLE_COUNT_PER_FRAME 8192
+#define GG_MAX_AUDIO_SAMPLE_COUNT_PER_FRAME 8192
 typedef struct {
-    i16 samples[KATANA_MAX_AUDIO_SAMPLE_COUNT_PER_FRAME];
+    i16 samples[GG_MAX_AUDIO_SAMPLE_COUNT_PER_FRAME];
     u32 sample_count;
     u32 samples_per_second;
 } game_audio_t;
 
 typedef struct {
-    game_controller_output_t controllers[KATANA_MAX_CONTROLLERS];
+    game_controller_output_t controllers[GG_MAX_CONTROLLERS];
 } game_output_t;
 
 typedef struct {

@@ -1,12 +1,12 @@
 CC = clang
 CFLAGS = -Wall -Werror -std=c11 -g -msse4 -fPIC -ffast-math
-DEFINES = -DKATANA_DEBUG 
+DEFINES = -DGG_DEBUG 
 DISABLED_WARNINGS = -Wno-unused-function
 
-BIN_TARGET = katana
-BIN_SRC = src/osx_katana.c
-GAME_TARGET = katana.so
-GAME_SRC = src/katana.c
+BIN_TARGET = gg
+BIN_SRC = src/gg_osx.c
+GAME_TARGET = gg.so
+GAME_SRC = src/gg_unitybuild.c
 
 SDL_HEADERS = /usr/local/include/SDL2
 SDL_LIB = SDL2

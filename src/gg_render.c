@@ -1,14 +1,6 @@
-#include "katana_math.h"
-#include "katana_types.h"
-#include "katana_vec.h"
-
-static inline v4 read_image_color(u32 buffer)
-{
-    return COLOR(((buffer >> 0) & 0xFF) / 255.0f,
-                 ((buffer >> 8) & 0xFF) / 255.0f,
-                 ((buffer >> 16) & 0xFF) / 255.0f,
-                 ((buffer >> 24) & 0xFF) / 255.0f);
-}
+#include "gg_math.h"
+#include "gg_types.h"
+#include "gg_vec.h"
 
 static inline v4 read_frame_buffer_color(u32 buffer)
 {
@@ -25,14 +17,22 @@ static inline u32 color_frame_buffer_u32(v4 color)
     return result;
 }
 
-static inline u32 color_image_32(v4 color)
+u32 color_image_32(v4 color)
 {
     u32 result = ((u32)(color.r * 255) & 0xFF) << 0 | ((u32)(color.g * 255) & 0xFF) << 8 |
                  ((u32)(color.b * 255) & 0xFF) << 16 | ((u32)(color.a * 255) & 0xFF) << 24;
     return result;
 }
 
-static inline v4 srgb_to_linear(v4 color)
+v4 read_image_color(u32 buffer)
+{
+    return COLOR(((buffer >> 0) & 0xFF) / 255.0f,
+                 ((buffer >> 8) & 0xFF) / 255.0f,
+                 ((buffer >> 16) & 0xFF) / 255.0f,
+                 ((buffer >> 24) & 0xFF) / 255.0f);
+}
+
+v4 srgb_to_linear(v4 color)
 {
     color.r = color.r * color.r;
     color.g = color.g * color.g;
@@ -41,7 +41,7 @@ static inline v4 srgb_to_linear(v4 color)
     return color;
 }
 
-static inline v4 linear_to_srgb(v4 color)
+v4 linear_to_srgb(v4 color)
 {
     color.r = ksqrt(color.r);
     color.g = ksqrt(color.g);
