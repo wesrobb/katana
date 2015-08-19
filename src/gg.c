@@ -438,13 +438,14 @@ void game_update_and_render(game_memory_t *memory,
         game_state->test_image3 = load_image("data/test_image3.png", callbacks->map_file);
         game_state->background_image = load_image("data/background/Bg 1.png", callbacks->map_file);
         game_state->tile_image = load_image("data/tiles/Box 01.png", callbacks->map_file);
-        game_state->player_images[0] = load_image("data/player/walk_with_sword/1.png", callbacks->map_file);
+        // game_state->player_images[0] = load_image("data/player/walk_with_sword/1.png", callbacks->map_file);
+        game_state->player_images[0] = load_image("data/sphere_normals.png", callbacks->map_file);
         game_state->player_images[1] = load_image("data/player/walk_with_sword/2.png", callbacks->map_file);
         game_state->player_images[2] = load_image("data/player/walk_with_sword/3.png", callbacks->map_file);
         game_state->player_images[3] = load_image("data/player/walk_with_sword/4.png", callbacks->map_file);
         game_state->player_images[4] = load_image("data/player/walk_with_sword/5.png", callbacks->map_file);
         game_state->player_images[5] = load_image("data/player/walk_with_sword/6.png", callbacks->map_file);
-        game_state->player_normal = load_image("data/player/walk_with_sword/1_nrm.png", callbacks->map_file);
+        game_state->player_normal = load_image("data/sphere_normals.png", callbacks->map_file);
         game_state->player_attack_images[0] = load_image("data/player/attack_with_sword/1.png", callbacks->map_file);
         game_state->player_attack_images[1] = load_image("data/player/attack_with_sword/2.png", callbacks->map_file);
         game_state->player_attack_images[2] = load_image("data/player/attack_with_sword/3.png", callbacks->map_file);
@@ -660,25 +661,31 @@ void game_update_and_render(game_memory_t *memory,
     }
 
     game_state->elapsed_time += input->delta_time;
-    f32 angle = game_state->elapsed_time * 0.1f;
-    f32 disp = kcosf(angle) * 20.0f;
+    f32 angle = game_state->elapsed_time * 0.5f;
+// f32 disp = kcosf(angle) * 50.0f;
 #if 0
     v2 x_axis = v2_mul(V2(kcosf(angle), ksinf(angle)), 60);
     v2 y_axis = v2_perp(x_axis);
-#endif
+#else
     v2 x_axis = V2(20.0f, 0.0f);
     v2 y_axis = V2(0.0f, 20.0f);
+#endif
 
+#if 0
     v2 origin = V2(40.0f, 40.0f);
-    origin = v2_add(origin, V2(disp, 0.0f));
-    origin = v2_sub(origin, v2_mul(x_axis, 0.5f));
-    origin = v2_sub(origin, v2_mul(y_axis, 0.5f));
+#else
+    v2 origin = v2_mul(V2(kcosf(angle), ksinf(angle)), 10);
+    origin = v2_add(origin, V2(50.0f, 50.0f));
+#endif
+    // origin = v2_add(origin, V2(disp, 0.0f));
+    // origin = v2_sub(origin, v2_mul(x_axis, 0.5f));
+    // origin = v2_sub(origin, v2_mul(y_axis, 0.5f));
     render_basis_t basis = {origin, x_axis, y_axis};
     v4 light_color = V4(1.0f, 1.0f, 1.0f, 1.0f);
-    v3 light_pos = V3(40.0f, 40.0f, 1.0f);
-    v4 ambient = V4(0.6f, 1.0f, 0.6f, 0.2f);
+    v3 light_pos = V3(60.0f, 60.0f, 5.0f);
+    v4 ambient = V4(0.0f, 0.0f, 0.0f, 0.2f);
     f32 constant_attenuation = 1.0f;
-    f32 linear_attenuation = 0.0f;
+    f32 linear_attenuation = 0.0045f;
     f32 quadratic_attenuation = 0.0f;
     light_t light = {light_color, light_pos, ambient, constant_attenuation, linear_attenuation, quadratic_attenuation};
     render_push_rotated_block(game_state->render_queue,

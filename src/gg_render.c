@@ -267,7 +267,7 @@ static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_fr
                 light_t *light = &cmd->lights[0];
 
                 v3 light_pos = v3_mul(light->position, cam->units_to_pixels);
-                v3 light_dir = v3_sub(light_pos, V3(x, y, 0.0f));
+                v3 light_dir = v3_sub(light_pos, V3(x, y, 0.0f)); // TODO(Wes): Objects in the world need a Z depth.
                 f32 light_distance = v3_len(light_dir);
                 light_dir = v3_normalize(light_dir);
 
@@ -279,6 +279,7 @@ static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_fr
                 f32 attenuation =
                     1.0f / ((light->constant_attentuation) + (light->linear_attenuation * light_distance) +
                             (light->quadratic_attenuation * light_distance * light_distance));
+                attenuation = kmin(attenuation, 1.0f);
 
                 v3 light_intensity = v3_mul(v3_add(diffuse, ambient_color), attenuation);
 
