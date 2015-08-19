@@ -682,12 +682,10 @@ void game_update_and_render(game_memory_t *memory,
     // origin = v2_sub(origin, v2_mul(y_axis, 0.5f));
     render_basis_t basis = {origin, x_axis, y_axis};
     v4 light_color = V4(1.0f, 1.0f, 1.0f, 1.0f);
-    v3 light_pos = V3(60.0f, 60.0f, 5.0f);
-    v4 ambient = V4(0.0f, 0.0f, 0.0f, 0.2f);
-    f32 constant_attenuation = 1.0f;
-    f32 linear_attenuation = 0.0045f;
-    f32 quadratic_attenuation = 0.0f;
-    light_t light = {light_color, light_pos, ambient, constant_attenuation, linear_attenuation, quadratic_attenuation};
+    v3 light_pos = V3(60.0f, 60.0f, 10.0f);
+    v4 ambient = V4(0.5f, 0.5f, 0.5f, 0.2f);
+    f32 radius = 100.0f;
+    light_t light = {light_color, light_pos, ambient, radius};
     render_push_rotated_block(game_state->render_queue,
                               &basis,
                               V2(2, 2),

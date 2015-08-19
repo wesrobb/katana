@@ -65,6 +65,11 @@ static inline f32 kmax(f32 a, f32 b)
     return a > b ? a : b;
 }
 
+static inline f32 ksq(f32 a)
+{
+    return a * a;
+}
+
 static inline void round4f(f32 const *in, f32 *out)
 {
     assert(is_aligned(in, 16));

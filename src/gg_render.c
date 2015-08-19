@@ -277,11 +277,10 @@ static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_fr
                 v3 diffuse = v3_mul(light_color, kmax(light_factor, 0.0f));
 
                 f32 attenuation =
-                    1.0f / ((light->constant_attentuation) + (light->linear_attenuation * light_distance) +
-                            (light->quadratic_attenuation * light_distance * light_distance));
-                attenuation = kmin(attenuation, 1.0f);
+                    kclampf(1.0f - (ksq(light_distance) / ksq(light->radius * cam->units_to_pixels)), 0.0f, 1.0f);
+                attenuation *= attenuation;
 
-                v3 light_intensity = v3_mul(v3_add(diffuse, ambient_color), attenuation);
+                v3 light_intensity = v3_mul(v3_clamp(v3_add(diffuse, ambient_color), 0.0f, 1.0f), attenuation);
 
                 // NOTE(Wes): Blend the closest 4 texels for better looking
                 // pixels. Bilinear blending.

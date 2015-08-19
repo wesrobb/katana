@@ -271,6 +271,11 @@ static inline v3 v3_hadamard(v3 a, v3 b)
     return V3(a.x * b.x, a.y * b.y, a.z * b.z);
 }
 
+static inline v3 v3_clamp(v3 a, f32 min, f32 max)
+{
+    return V3(kclampf(a.x, min, max), kclampf(a.y, min, max), kclampf(a.z, min, max));
+}
+
 static inline v4 v4_add(v4 a, v4 b)
 {
     return V4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);

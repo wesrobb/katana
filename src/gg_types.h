@@ -100,12 +100,7 @@ typedef struct {
     // Lights have a Z axis so that we know the angle the light hits the normal map.
     v3 position;
     v4 ambient; // TODO(Wes): This should not be stored per light.
-
-    // NOTE(Wes): This is the Linear-Constant-Quadratic light fall off.
-    // See https://developer.valvesoftware.com/wiki/Constant-Linear-Quadratic_Falloff for more info.
-    f32 constant_attentuation;
-    f32 linear_attenuation;
-    f32 quadratic_attenuation;
+    f32 radius;
 } light_t;
 
 typedef struct {
@@ -158,10 +153,10 @@ typedef struct {
 typedef struct {
     entity_t entities[GG_MAX_ENTITIES];           // Entity 0 is the "null" entity
     v2 camera_tracked_positions[GG_MAX_ENTITIES]; // Camera will
-                                                      // always ensure
-                                                      // these
-                                                      // positions are
-                                                      // in view.
+                                                  // always ensure
+                                                  // these
+                                                  // positions are
+                                                  // in view.
     u32 controlled_entities[GG_MAX_CONTROLLERS];
     tilemap_t tilemap;
     camera_t camera;
