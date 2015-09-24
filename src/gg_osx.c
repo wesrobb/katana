@@ -54,9 +54,7 @@ static osx_game_so_paths_t osx_get_game_so_paths()
     char symbolic_exe_path[1024] = {0};
     u32 size = sizeof(symbolic_exe_path);
     if (_NSGetExecutablePath(symbolic_exe_path, &size) == 0) {
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Symbolic exe path is:  %s",
-                    symbolic_exe_path);
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Symbolic exe path is:  %s", symbolic_exe_path);
         // TODO(Wes) : Handle failure to get exe path.
     }
 
@@ -116,28 +114,22 @@ static void osx_process_controller_button(game_button_state_t *old_state,
                                           SDL_GameController *controller_handle,
                                           SDL_GameControllerButton button)
 {
-    new_state->ended_down =
-        SDL_GameControllerGetButton(controller_handle, button);
-    new_state->half_transition_count +=
-        ((new_state->ended_down == old_state->ended_down) ? 0 : 1);
+    new_state->ended_down = SDL_GameControllerGetButton(controller_handle, button);
+    new_state->half_transition_count += ((new_state->ended_down == old_state->ended_down) ? 0 : 1);
 }
 
-static void osx_process_keydown(game_button_state_t *old_state,
-                                game_button_state_t *new_state)
+static void osx_process_keydown(game_button_state_t *old_state, game_button_state_t *new_state)
 {
     new_state->ended_down = 1;
     old_state->ended_down = 1;
-    new_state->half_transition_count +=
-        ((new_state->ended_down == old_state->ended_down) ? 0 : 1);
+    new_state->half_transition_count += ((new_state->ended_down == old_state->ended_down) ? 0 : 1);
 }
 
-static void osx_process_keyup(game_button_state_t *old_state,
-                              game_button_state_t *new_state)
+static void osx_process_keyup(game_button_state_t *old_state, game_button_state_t *new_state)
 {
     new_state->ended_down = 0;
     old_state->ended_down = 0;
-    new_state->half_transition_count +=
-        ((new_state->ended_down == old_state->ended_down) ? 0 : 1);
+    new_state->half_transition_count += ((new_state->ended_down == old_state->ended_down) ? 0 : 1);
 }
 
 static f32 osx_process_controller_axis(i16 stick_value, i16 dead_zone_threshold)
@@ -145,18 +137,15 @@ static f32 osx_process_controller_axis(i16 stick_value, i16 dead_zone_threshold)
     f32 result = 0;
 
     if (stick_value < -dead_zone_threshold) {
-        result = (f32)((stick_value + dead_zone_threshold) /
-                       (32768.0f - dead_zone_threshold));
+        result = (f32)((stick_value + dead_zone_threshold) / (32768.0f - dead_zone_threshold));
     } else if (stick_value > dead_zone_threshold) {
-        result = (f32)((stick_value - dead_zone_threshold) /
-                       (32767.0f - dead_zone_threshold));
+        result = (f32)((stick_value - dead_zone_threshold) / (32767.0f - dead_zone_threshold));
     }
 
     return result;
 }
 
-static void osx_handle_controller_input(game_input_t *new_input,
-                                        game_input_t *old_input)
+static void osx_handle_controller_input(game_input_t *new_input, game_input_t *old_input)
 {
     for (int i = 0; i < GG_MAX_CONTROLLERS; ++i) {
         if (!SDL_GameControllerGetAttached(controller_handles[i])) {
@@ -167,30 +156,18 @@ static void osx_handle_controller_input(game_input_t *new_input,
         game_controller_input_t *old_controller = &old_input->controllers[i];
         game_controller_input_t *new_controller = &new_input->controllers[i];
 
-        osx_process_controller_button(&(old_controller->move_up),
-                                      &(new_controller->move_up),
-                                      handle,
-                                      SDL_CONTROLLER_BUTTON_DPAD_UP);
-        osx_process_controller_button(&(old_controller->move_down),
-                                      &(new_controller->move_down),
-                                      handle,
-                                      SDL_CONTROLLER_BUTTON_DPAD_DOWN);
-        osx_process_controller_button(&(old_controller->move_left),
-                                      &(new_controller->move_left),
-                                      handle,
-                                      SDL_CONTROLLER_BUTTON_DPAD_LEFT);
-        osx_process_controller_button(&(old_controller->move_right),
-                                      &(new_controller->move_right),
-                                      handle,
-                                      SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
-        osx_process_controller_button(&(old_controller->start),
-                                      &(new_controller->start),
-                                      handle,
-                                      SDL_CONTROLLER_BUTTON_START);
-        osx_process_controller_button(&(old_controller->back),
-                                      &(new_controller->back),
-                                      handle,
-                                      SDL_CONTROLLER_BUTTON_BACK);
+        osx_process_controller_button(
+            &(old_controller->move_up), &(new_controller->move_up), handle, SDL_CONTROLLER_BUTTON_DPAD_UP);
+        osx_process_controller_button(
+            &(old_controller->move_down), &(new_controller->move_down), handle, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+        osx_process_controller_button(
+            &(old_controller->move_left), &(new_controller->move_left), handle, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+        osx_process_controller_button(
+            &(old_controller->move_right), &(new_controller->move_right), handle, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+        osx_process_controller_button(
+            &(old_controller->start), &(new_controller->start), handle, SDL_CONTROLLER_BUTTON_START);
+        osx_process_controller_button(
+            &(old_controller->back), &(new_controller->back), handle, SDL_CONTROLLER_BUTTON_BACK);
         osx_process_controller_button(&(old_controller->left_shoulder),
                                       &(new_controller->left_shoulder),
                                       handle,
@@ -199,47 +176,29 @@ static void osx_handle_controller_input(game_input_t *new_input,
                                       &(new_controller->right_shoulder),
                                       handle,
                                       SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
-        osx_process_controller_button(&(old_controller->action_down),
-                                      &(new_controller->action_down),
-                                      handle,
-                                      SDL_CONTROLLER_BUTTON_A);
-        osx_process_controller_button(&(old_controller->action_up),
-                                      &(new_controller->action_up),
-                                      handle,
-                                      SDL_CONTROLLER_BUTTON_Y);
-        osx_process_controller_button(&(old_controller->action_left),
-                                      &(new_controller->action_left),
-                                      handle,
-                                      SDL_CONTROLLER_BUTTON_X);
-        osx_process_controller_button(&(old_controller->action_right),
-                                      &(new_controller->action_right),
-                                      handle,
-                                      SDL_CONTROLLER_BUTTON_B);
+        osx_process_controller_button(
+            &(old_controller->action_down), &(new_controller->action_down), handle, SDL_CONTROLLER_BUTTON_A);
+        osx_process_controller_button(
+            &(old_controller->action_up), &(new_controller->action_up), handle, SDL_CONTROLLER_BUTTON_Y);
+        osx_process_controller_button(
+            &(old_controller->action_left), &(new_controller->action_left), handle, SDL_CONTROLLER_BUTTON_X);
+        osx_process_controller_button(
+            &(old_controller->action_right), &(new_controller->action_right), handle, SDL_CONTROLLER_BUTTON_B);
 
-        i16 left_stick_x =
-            SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_LEFTX);
-        i16 left_stick_y =
-            SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_LEFTY);
-        i16 right_stick_x =
-            SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_RIGHTX);
-        i16 right_stick_y =
-            SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_RIGHTY);
+        i16 left_stick_x = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_LEFTX);
+        i16 left_stick_y = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_LEFTY);
+        i16 right_stick_x = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_RIGHTX);
+        i16 right_stick_y = SDL_GameControllerGetAxis(handle, SDL_CONTROLLER_AXIS_RIGHTY);
         // TODO(Wes): Tune dead zones
         const i16 dead_zone = 4096;
-        new_controller->left_stick_x =
-            osx_process_controller_axis(left_stick_x, dead_zone);
-        new_controller->left_stick_y =
-            osx_process_controller_axis(left_stick_y, dead_zone);
-        new_controller->right_stick_x =
-            osx_process_controller_axis(right_stick_x, dead_zone);
-        new_controller->right_stick_y =
-            osx_process_controller_axis(right_stick_y, dead_zone);
+        new_controller->left_stick_x = osx_process_controller_axis(left_stick_x, dead_zone);
+        new_controller->left_stick_y = osx_process_controller_axis(left_stick_y, dead_zone);
+        new_controller->right_stick_x = osx_process_controller_axis(right_stick_x, dead_zone);
+        new_controller->right_stick_y = osx_process_controller_axis(right_stick_y, dead_zone);
     }
 }
 
-static void osx_handle_keyup(SDL_Keycode key,
-                             game_controller_input_t *old_input,
-                             game_controller_input_t *new_input)
+static void osx_handle_keyup(SDL_Keycode key, game_controller_input_t *old_input, game_controller_input_t *new_input)
 {
     switch (key) {
     case SDLK_w:
@@ -267,9 +226,7 @@ static void osx_handle_keyup(SDL_Keycode key,
     }
 }
 
-static void osx_handle_keydown(SDL_Keycode key,
-                               game_controller_input_t *old_input,
-                               game_controller_input_t *new_input)
+static void osx_handle_keydown(SDL_Keycode key, game_controller_input_t *old_input, game_controller_input_t *new_input)
 {
     switch (key) {
     case SDLK_w:
@@ -292,8 +249,7 @@ static void osx_handle_keydown(SDL_Keycode key,
         osx_process_keydown(&(old_input->start), &(new_input->start));
         break;
     case SDLK_SPACE:
-        osx_process_keydown(&(old_input->action_down),
-                            &(new_input->action_down));
+        osx_process_keydown(&(old_input->action_down), &(new_input->action_down));
         break;
     }
 }
@@ -302,30 +258,23 @@ static game_memory_t osx_allocate_game_memory(void *base_address)
 {
     game_memory_t memory = {};
     memory.transient_store_size = Megabytes(512);
-    memory.transient_store = mmap(base_address,
-                                  memory.transient_store_size,
+    memory.transient_store =
+        mmap(base_address, memory.transient_store_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+
+    memory.permanent_store_size = Megabytes(64);
+    memory.permanent_store = mmap((void *)(base_address + memory.transient_store_size),
+                                  memory.permanent_store_size,
                                   PROT_READ | PROT_WRITE,
                                   MAP_ANON | MAP_PRIVATE,
                                   -1,
                                   0);
-
-    memory.permanent_store_size = Megabytes(64);
-    memory.permanent_store =
-        mmap((void *)(base_address + memory.transient_store_size),
-             memory.permanent_store_size,
-             PROT_READ | PROT_WRITE,
-             MAP_ANON | MAP_PRIVATE,
-             -1,
-             0);
     return memory;
 }
 
 static void osx_copy_game_memory(game_memory_t *dst, game_memory_t *src)
 {
-    memcpy(
-        dst->transient_store, src->transient_store, src->transient_store_size);
-    memcpy(
-        dst->permanent_store, src->permanent_store, src->permanent_store_size);
+    memcpy(dst->transient_store, src->transient_store, src->transient_store_size);
+    memcpy(dst->permanent_store, src->permanent_store, src->permanent_store_size);
 }
 
 static mapped_file_t osx_map_file(const char *path)
@@ -333,8 +282,7 @@ static mapped_file_t osx_map_file(const char *path)
     mapped_file_t result = {};
     int fd = open(path, O_RDONLY);
     if (fd == -1) {
-        SDL_LogError(
-            SDL_LOG_CATEGORY_APPLICATION, "Failed to open file %s", path);
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to open file %s", path);
         return result;
     }
 
@@ -343,11 +291,9 @@ static mapped_file_t osx_map_file(const char *path)
     stat(path, &st);
 
     result.size = st.st_size;
-    result.contents =
-        mmap(0, result.size, PROT_READ, MAP_FILE | MAP_PRIVATE, fd, 0);
+    result.contents = mmap(0, result.size, PROT_READ, MAP_FILE | MAP_PRIVATE, fd, 0);
     if (result.contents == MAP_FAILED) {
-        SDL_LogError(
-            SDL_LOG_CATEGORY_APPLICATION, "Failed to read file %s", path);
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to read file %s", path);
         result.size = 0;
         result.contents = 0;
     }
@@ -372,30 +318,21 @@ int main(void)
     i32 window_height = 720;
     i32 windoy_pos_x = 10;
     i32 windoy_pos_y = 400;
-    
-    SDL_Window *window = SDL_CreateWindow("Handmade Hero",
-                                          windoy_pos_x,
-                                          windoy_pos_y,
-                                          window_width,
-                                          window_height,
-                                          SDL_WINDOW_RESIZABLE);
 
-    SDL_Renderer *renderer = SDL_CreateRenderer(
-        window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    SDL_Window *window = SDL_CreateWindow(
+        "Handmade Hero", windoy_pos_x, windoy_pos_y, window_width, window_height, SDL_WINDOW_RESIZABLE);
+
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     u32 frame_buffer_width = 1280;
     u32 frame_buffer_height = 720;
-    SDL_Texture *texture = SDL_CreateTexture(renderer,
-                                             SDL_PIXELFORMAT_RGBA8888,
-                                             SDL_TEXTUREACCESS_STREAMING,
-                                             frame_buffer_width,
-                                             frame_buffer_height);
+    SDL_Texture *texture = SDL_CreateTexture(
+        renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, frame_buffer_width, frame_buffer_height);
 
     SDL_AudioSpec audio_spec_want = {};
     audio_spec_want.freq = 48000;
     audio_spec_want.format = AUDIO_S16LSB;
     audio_spec_want.channels = 2;
-    audio_spec_want.samples =
-        (audio_spec_want.freq / 60) * audio_spec_want.channels;
+    audio_spec_want.samples = (audio_spec_want.freq / 60) * audio_spec_want.channels;
 
     /* SDL_AudioDeviceID audio_device = SDL_OpenAudioDevice(0, 0,
     &audio_spec_want, 0, 0);
@@ -433,23 +370,18 @@ int main(void)
         }
         SDL_GameController *controller = SDL_GameControllerOpen(i);
         controller_handles[controller_index] = controller;
-        SDL_Joystick *joystick_handle =
-            SDL_GameControllerGetJoystick(controller);
+        SDL_Joystick *joystick_handle = SDL_GameControllerGetJoystick(controller);
         SDL_Haptic *haptic_handle = SDL_HapticOpenFromJoystick(joystick_handle);
         if (haptic_handle) {
             haptic_handles[controller_index] = haptic_handle;
         } else {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Failed to initialize haptics %s",
-                        SDL_GetError());
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Failed to initialize haptics %s", SDL_GetError());
         }
         osx_init_controller(new_input, controller_index);
         controller_index++;
 
         if (SDL_HapticRumbleInit(haptic_handles[controller_index]) != 0) {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Failed to initialize rumble %s",
-                        SDL_GetError());
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Failed to initialize rumble %s", SDL_GetError());
             // Failed to init rumble so just turn it off.
             SDL_HapticClose(haptic_handles[controller_index]);
             haptic_handles[controller_index] = 0;
@@ -463,13 +395,8 @@ int main(void)
     audio.sample_count = audio_spec_want.samples;
 
     osx_game_record_t game_record = {};
-    game_record.input_events =
-        mmap(0,
-             sizeof(game_input_t) * GG_MAX_RECORDED_INPUT_EVENTS,
-             PROT_READ | PROT_WRITE,
-             MAP_ANON | MAP_PRIVATE,
-             -1,
-             0);
+    game_record.input_events = mmap(
+        0, sizeof(game_input_t) * GG_MAX_RECORDED_INPUT_EVENTS, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     game_record.memory = osx_allocate_game_memory((void *)Terabytes(4));
 
     game_callbacks_t callbacks = {};
@@ -493,18 +420,16 @@ int main(void)
                 break;
             case SDL_KEYUP:
                 if (kb_controller_index != -1) {
-                    osx_handle_keyup(
-                        event.key.keysym.sym,
-                        &old_input->controllers[kb_controller_index],
-                        &new_input->controllers[kb_controller_index]);
+                    osx_handle_keyup(event.key.keysym.sym,
+                                     &old_input->controllers[kb_controller_index],
+                                     &new_input->controllers[kb_controller_index]);
                 }
                 break;
             case SDL_KEYDOWN:
                 if (event.key.keysym.sym == SDLK_r) {
                     if (recording) {
-                        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                                    "Recorded %d input events",
-                                    game_record.input_record_index);
+                        SDL_LogInfo(
+                            SDL_LOG_CATEGORY_APPLICATION, "Recorded %d input events", game_record.input_record_index);
                         recording = 0;
                     } else {
                         osx_copy_game_memory(&game_record.memory, &game_memory);
@@ -526,10 +451,9 @@ int main(void)
 
                 // NOTE(Wes): Pass other keys to the game.
                 if (kb_controller_index != -1) {
-                    osx_handle_keydown(
-                        event.key.keysym.sym,
-                        &old_input->controllers[kb_controller_index],
-                        &new_input->controllers[kb_controller_index]);
+                    osx_handle_keydown(event.key.keysym.sym,
+                                       &old_input->controllers[kb_controller_index],
+                                       &new_input->controllers[kb_controller_index]);
                 }
             }
         }
@@ -537,8 +461,7 @@ int main(void)
         // TODO(Wes): Debug builds only.
         time_t last_modified = osx_get_last_modified(game_so_paths.so);
         if (difftime(last_modified, game.so_last_modified) != 0) {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "gg.so modified - Reloading");
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "gg.so modified - Reloading");
             dlclose(game.so);
             copyfile(game_so_paths.so, game_so_paths.temp_so, 0, COPYFILE_ALL);
             osx_load_game(&game, game_so_paths.temp_so);
@@ -549,11 +472,9 @@ int main(void)
         new_input->delta_time = frame_sec;
 
         if (recording) {
-            game_record.input_events[game_record.input_record_index++] =
-                *new_input;
+            game_record.input_events[game_record.input_record_index++] = *new_input;
         } else if (playing_back) {
-            u32 playback_index = game_record.input_playback_index++ %
-                                 (game_record.input_record_index + 1);
+            u32 playback_index = game_record.input_playback_index++ % (game_record.input_record_index + 1);
             if (playback_index == 0) {
                 osx_copy_game_memory(&game_memory, &game_record.memory);
             }
@@ -562,19 +483,11 @@ int main(void)
 
         // NOTE(Wes): The frame buffer pixels point directly to the SDL
         // texture.
-        SDL_LockTexture(texture,
-                        0,
-                        (void **)&frame_buffer.data,
-                        (i32 *)&frame_buffer.pitch);
+        SDL_LockTexture(texture, 0, (void **)&frame_buffer.data, (i32 *)&frame_buffer.pitch);
         // NOTE(Wes): Set the pitch to num pixels.
         frame_buffer.pitch /= sizeof(u32);
 
-        game.update_and_render_fn(&game_memory,
-                                  &frame_buffer,
-                                  &audio,
-                                  new_input,
-                                  &output,
-                                  &callbacks);
+        game.update_and_render_fn(&game_memory, &frame_buffer, &audio, new_input, &output, &callbacks);
         SDL_UnlockTexture(texture);
 
         SDL_RenderCopy(renderer, texture, 0, 0);
@@ -590,9 +503,7 @@ int main(void)
                 continue;
             }
             if (output.controllers[i].rumble) {
-                SDL_HapticRumblePlay(haptic_handles[i],
-                                     output.controllers[i].intensity,
-                                     SDL_HAPTIC_INFINITY);
+                SDL_HapticRumblePlay(haptic_handles[i], output.controllers[i].intensity, SDL_HAPTIC_INFINITY);
             } else {
                 SDL_HapticRumbleStop(haptic_handles[i]);
             }
@@ -606,9 +517,7 @@ int main(void)
         frame_sec = (current_time - last_time) / (f32)perf_freq;
         last_time = current_time;
         if (frame_counter++ % 180 == 0) {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Frame time %.02f ms",
-                        frame_sec * 1000);
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Frame time %.02f ms", frame_sec * 1000);
             // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Queued
             // audio bytes %d",
             // queued_audio_size);

@@ -2,6 +2,7 @@
 #include "gg_math.h"
 #include "gg_vec.h"
 #include "gg_render.h"
+#include "gg_collider.h"
 
 #define STB_ASSERT(x) assert(x);
 #define STBI_ONLY_PNG
@@ -663,10 +664,9 @@ void game_update_and_render(game_memory_t *memory,
     game_state->elapsed_time += input->delta_time;
     f32 angle = game_state->elapsed_time * 0.5f;
 // f32 disp = kcosf(angle) * 50.0f;
-#if 0
-    v2 x_axis = v2_mul(V2(kcosf(angle), ksinf(angle)), 60);
-    v2 y_axis = v2_perp(x_axis);
-#else
+#if 1
+    // v2 x_axis = v2_mul(V2(kcosf(angle), ksinf(angle)), 60);
+    // v2 y_axis = v2_perp(x_axis);
     v2 x_axis = V2(20.0f, 0.0f);
     v2 y_axis = V2(0.0f, 20.0f);
 #endif
@@ -676,26 +676,65 @@ void game_update_and_render(game_memory_t *memory,
 #else
     v2 origin = v2_mul(V2(kcosf(angle), ksinf(angle)), 10);
     origin = v2_add(origin, V2(50.0f, 50.0f));
+    origin = V2(50.0f, 50.0f);
+    v2 light_origin = v2_mul(V2(kcosf(angle), ksinf(angle)), 10);
+    light_origin = v2_add(light_origin, V2(50.0f, 50.0f));
 #endif
-    // origin = v2_add(origin, V2(disp, 0.0f));
-    // origin = v2_sub(origin, v2_mul(x_axis, 0.5f));
-    // origin = v2_sub(origin, v2_mul(y_axis, 0.5f));
-    render_basis_t basis = {origin, x_axis, y_axis};
-    v4 light_color = V4(1.0f, 1.0f, 1.0f, 1.0f);
-    v3 light_pos = V3(60.0f, 60.0f, 10.0f);
-    v4 ambient = V4(0.5f, 0.5f, 0.5f, 0.2f);
-    f32 radius = 100.0f;
-    light_t light = {light_color, light_pos, ambient, radius};
-    render_push_rotated_block(game_state->render_queue,
-                              &basis,
-                              V2(2, 2),
-                              COLOR(1, 1, 1, 1),
-                              &game_state->player_images[0],
-                              &game_state->player_normal,
-                              &light,
-                              1);
+// origin = v2_add(origin, V2(disp, 0.0f));
+// origin = v2_sub(origin, v2_mul(x_axis, 0.5f));
+// origin = v2_sub(origin, v2_mul(y_axis, 0.5f));
+#if 1
+    basis_t basis = {origin, x_axis, y_axis};
+/*  v4 light_color = V4(1.0f, 1.0f, 1.0f, 1.0f);
+  v3 light_pos = V3(light_origin.x, light_origin.y, 10.0f);
+  v4 ambient = V4(0.5f, 0.5f, 0.5f, 0.6f);
+  f32 radius = 100.0f;
+  light_t light = {light_color, light_pos, ambient, radius};
+render_push_rotated_block(game_state->render_queue,
+                        &basis,
+                        V2(2, 2),
+                        COLOR(1, 1, 1, 1),
+                        &game_state->player_images[0],
+                        &game_state->player_normal,
+                        &light,
+                        1);
+                        */
+#endif
 
+#if 0
+    // NOTE(Wes): TEST COLLIDER CODE
+    v2 *points1 = push_array(&game_state->frame_arena, 4, v2);
+    points1[0] = V2(20.0f, 20.0f);
+    points1[1] = V2(20.0f, 40.0f);
+    points1[2] = V2(40.0f, 40.0f);
+    points1[3] = V2(40.0f, 20.0f);
+    mesh_t mesh1 = {points1, 4};
+
+    v2 *points2 = push_array(&game_state->frame_arena, 4, v2);
+    points2[0] = V2(30.0f, 30.0f);
+    points2[1] = V2(30.0f, 50.0f);
+    points2[2] = V2(50.0f, 50.0f);
+    points2[3] = V2(50.0f, 30.0f);
+
+    mesh_t mesh2 = {points2, 4};
+
+#endif
+    v2 o = {{50.0f, 36.0f}};
+    v2 x = {{10.0f, 2.0f}};
+    v2 y = v2_perp(x);
+    basis_t line1_basis = {o, x, y};
+
+    v4 line_color = V4(1.0f, 1.0f, 0.0f, 1.0f);
+    if (collider_test(&basis, &line1_basis)) {
+        line_color = V4(1.0f, 0.0f, 1.0f, 1.0f);
+    }
+
+    render_push_line(game_state->render_queue, &line1_basis, V2(0, 0), V2(0, 0), 5.0f, line_color);
+    render_push_line(game_state->render_queue, &basis, V2(0, 0), V2(0, 0), 5.0f, line_color);
     render_draw_queue(game_state->render_queue, frame_buffer);
 
     output_sine_wave(game_state, audio);
+
+    // NOTE(Wes): Free transient frame memory.
+    game_state->frame_arena.index = 0;
 }

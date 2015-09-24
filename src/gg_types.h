@@ -29,6 +29,11 @@ void *push_size(memory_arena_t *arena, u32 size)
 }
 
 typedef struct {
+    v2 pos;
+    v2 size;
+} rect_t;
+
+typedef struct {
     u32 *data; // Always 4bpp. Order is always RGBA
     u32 w;
     u32 h;
@@ -79,6 +84,8 @@ typedef struct {
     f32 velocity_factor;
     f32 acceleration_factor;
 
+    f32 rotation;
+
     b8 on_ground;
     b8 exists;
 
@@ -107,38 +114,7 @@ typedef struct {
     v2 origin;
     v2 x_axis;
     v2 y_axis;
-} render_basis_t;
-
-typedef enum { render_type_clear, render_type_block, render_type_image, render_type_rotated_block } render_type_t;
-
-typedef struct {
-    render_type_t type;
-    render_basis_t basis;
-} render_cmd_header_t;
-
-typedef struct {
-    render_cmd_header_t header;
-    v4 color;
-} render_cmd_clear_t;
-
-typedef struct {
-    render_cmd_header_t header;
-    v2 pos;
-    v2 size;
-    v4 tint;
-    image_t *image;
-    image_t *normals;
-    light_t *lights;
-    u32 num_lights;
-} render_cmd_block_t;
-
-typedef struct {
-    render_cmd_header_t header;
-    v2 pos;
-    v2 size;
-    image_t *image;
-    b8 flip_x;
-} render_cmd_image_t;
+} basis_t;
 
 typedef struct {
     camera_t *camera;
