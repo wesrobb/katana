@@ -1,5 +1,5 @@
 CC = clang
-CFLAGS = -Wall -Werror -std=c11 -O0 -g -msse4 -fPIC -ffast-math
+CFLAGS = -Wall -Werror -std=c11 -O2 -g -msse4 -fPIC -ffast-math -Wno-unused-variable
 DEFINES = -DGG_DEBUG 
 DISABLED_WARNINGS = -Wno-unused-function
 

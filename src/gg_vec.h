@@ -90,6 +90,7 @@ typedef union {
             r, g, b, a                                                                                                 \
         }                                                                                                              \
     }
+#define V4_ZERO V4(0.0f, 0.0f, 0.0f, 0.0f)
 
 static inline v2 v2_add(v2 a, v2 b)
 {

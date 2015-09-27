@@ -314,7 +314,7 @@ static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_fr
                 // TODO(Wes): Create light volumes out of convex shapes.
                 //            We can then use SAT collision detection to determine
                 //            which entities the light is affecting.
-                v3 normal = V3(0.0f, 0.0f, 1.0f);
+                v3 normal = V3(0.5f, 0.5f, 1.0f);
                 if (normals) {
                     u32 *normal255 = &normals->data[texture_y * texture->w + texture_x];
                     normal = read_image_color(*normal255).rgb;

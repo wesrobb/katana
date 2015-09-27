@@ -242,6 +242,9 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         entity->velocity = v2_add(v2_mul(average_accel, input->delta_time), entity->velocity);
         entity->acceleration = new_accel;
 
+        v2 position_delta = v2_sub(new_entity_pos, entity->position);
+
+#if 0
         // Get the movement direction as -1 = left/up, 0 = unused, 1 =
         // right/down
         v2i move_dir = v2_sign(entity->velocity);
@@ -300,6 +303,7 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         } else {
             entity->on_ground = 0;
         }
+#endif
 
         // Track entity positions for the camera
         if (entity->type == entity_type_player || entity->type == entity_type_teleporter) {
@@ -439,8 +443,7 @@ void game_update_and_render(game_memory_t *memory,
         game_state->test_image3 = load_image("data/test_image3.png", callbacks->map_file);
         game_state->background_image = load_image("data/background/Bg 1.png", callbacks->map_file);
         game_state->tile_image = load_image("data/tiles/Box 01.png", callbacks->map_file);
-        // game_state->player_images[0] = load_image("data/player/walk_with_sword/1.png", callbacks->map_file);
-        game_state->player_images[0] = load_image("data/sphere_normals.png", callbacks->map_file);
+        game_state->player_images[0] = load_image("data/player/walk_with_sword/1.png", callbacks->map_file);
         game_state->player_images[1] = load_image("data/player/walk_with_sword/2.png", callbacks->map_file);
         game_state->player_images[2] = load_image("data/player/walk_with_sword/3.png", callbacks->map_file);
         game_state->player_images[3] = load_image("data/player/walk_with_sword/4.png", callbacks->map_file);
@@ -461,7 +464,7 @@ void game_update_and_render(game_memory_t *memory,
         init_arena(&game_state->frame_arena, memory->transient_store_size, memory->transient_store);
 
         // TODO(Wes): This breaks the hot reloading. Fix it.
-        game_state->render_queue = render_alloc_queue(&game_state->frame_arena, 10000, &game_state->world.camera);
+        game_state->render_queue = render_alloc_queue(&game_state->frame_arena, 20000, &game_state->world.camera);
 
         memory->is_initialized = 1;
     }
@@ -577,21 +580,41 @@ void game_update_and_render(game_memory_t *memory,
 #endif
     // NOTE(Wes): Start by clearing the screen.
     render_push_clear(game_state->render_queue, COLOR(1.0f, 1.0f, 1.0f, 1.0f));
+    game_state->elapsed_time += input->delta_time;
+    f32 angle = game_state->elapsed_time * 0.5f;
+    v2 light_origin = v2_mul(V2(kcosf(angle), ksinf(angle)), 10);
+    light_origin = v2_add(light_origin, V2(50.0f, 50.0f));
+    v4 light_color = V4(1.0f, 1.0f, 1.0f, 1.0f);
+    v3 light_pos = V3(light_origin.x, light_origin.y, 15.0f);
+    v4 ambient = V4(0.5f, 0.5f, 0.5f, 0.6f);
+    f32 radius = 50.0f;
+    light_t light = {light_color, light_pos, ambient, radius};
 
 #if 1
-    v2 background_pos = V2(64.0f, 36.0f);
+    v2 background_pos = V2(0.0f, 0.0f);
     v2 background_size = V2(128.0f, 72.0f);
-    render_push_image(game_state->render_queue, background_pos, background_size, &game_state->background_image, 0);
+    basis_t background_basis = {background_pos, V2(background_size.x, 0.0f), V2(0.0f, background_size.y)};
+    render_push_rotated_block(game_state->render_queue,
+                              &background_basis,
+                              V4(1.0f, 1.0f, 1.0f, 1.0f),
+                              &game_state->background_image,
+                              0,
+                              &light,
+                              1);
     for (u32 i = 0; i < 18; ++i) {
         for (u32 j = 0; j < 32; ++j) {
             if (tilemap->tiles[j + i * tilemap->tiles_wide]) {
                 v2 tile_origin;
                 tile_origin.x = j * tilemap->tile_size.x;
                 tile_origin.y = i * tilemap->tile_size.y;
-                v2 tile_half_size = v2_div(tilemap->tile_size, 2.0f);
-                tile_origin = v2_add(tile_origin, tile_half_size);
-                render_push_image(
-                    game_state->render_queue, tile_origin, tilemap->tile_size, &game_state->tile_image, 1);
+                basis_t tile_basis = {tile_origin, V2(tilemap->tile_size.x, 0.0f), V2(0.0f, tilemap->tile_size.y)};
+                render_push_rotated_block(game_state->render_queue,
+                                          &tile_basis,
+                                          V4(1.0f, 1.0f, 1.0f, 1.0f),
+                                          &game_state->tile_image,
+                                          0,
+                                          &light,
+                                          1);
             }
         }
     }
@@ -634,11 +657,17 @@ void game_update_and_render(game_memory_t *memory,
                     }
                 }
             }
-            v2 draw_offset = V2(0.3f, -0.4f);
+            v2 draw_offset = V2(-4.0f, -2.7f);
             v2 size = V2(8.0f, 5.0f);
             v2 draw_pos = v2_add(entity->position, draw_offset);
-            render_push_image(
-                game_state->render_queue, draw_pos, size, &anim->frames[anim->current_frame], entity->velocity.x > 0);
+            basis_t player_basis = {draw_pos, V2(size.x, 0.0f), V2(0.0f, size.y)};
+            render_push_rotated_block(game_state->render_queue,
+                                      &player_basis,
+                                      V4(1.0f, 1.0f, 1.0f, 1.0f),
+                                      &anim->frames[anim->current_frame],
+                                      &game_state->player_normal,
+                                      &light,
+                                      1);
 
             // Debug drawing for katana point.
             if (entity->player.attacking) {
@@ -661,76 +690,66 @@ void game_update_and_render(game_memory_t *memory,
         }
     }
 
-    game_state->elapsed_time += input->delta_time;
-    f32 angle = game_state->elapsed_time * 0.5f;
+/*
+game_state->elapsed_time += input->delta_time;
+f32 angle = game_state->elapsed_time * 0.5f;
 // f32 disp = kcosf(angle) * 50.0f;
 #if 1
-    // v2 x_axis = v2_mul(V2(kcosf(angle), ksinf(angle)), 60);
-    // v2 y_axis = v2_perp(x_axis);
-    v2 x_axis = V2(20.0f, 0.0f);
-    v2 y_axis = V2(0.0f, 20.0f);
+// v2 x_axis = v2_mul(V2(kcosf(angle), ksinf(angle)), 60);
+// v2 y_axis = v2_perp(x_axis);
+v2 x_axis = V2(20.0f, 0.0f);
+v2 y_axis = V2(0.0f, 20.0f);
 #endif
 
 #if 0
-    v2 origin = V2(40.0f, 40.0f);
+v2 origin = V2(40.0f, 40.0f);
 #else
-    v2 origin = v2_mul(V2(kcosf(angle), ksinf(angle)), 10);
-    origin = v2_add(origin, V2(50.0f, 50.0f));
-    origin = V2(50.0f, 50.0f);
-    v2 light_origin = v2_mul(V2(kcosf(angle), ksinf(angle)), 10);
-    light_origin = v2_add(light_origin, V2(50.0f, 50.0f));
+v2 origin = v2_mul(V2(kcosf(angle), ksinf(angle)), 10);
+origin = v2_add(origin, V2(50.0f, 50.0f));
+origin = V2(50.0f, 50.0f);
+v2 light_origin = v2_mul(V2(kcosf(angle), ksinf(angle)), 10);
+light_origin = v2_add(light_origin, V2(50.0f, 50.0f));
 #endif
 // origin = v2_add(origin, V2(disp, 0.0f));
 // origin = v2_sub(origin, v2_mul(x_axis, 0.5f));
 // origin = v2_sub(origin, v2_mul(y_axis, 0.5f));
 #if 1
-    basis_t basis = {origin, x_axis, y_axis};
-/*  v4 light_color = V4(1.0f, 1.0f, 1.0f, 1.0f);
-  v3 light_pos = V3(light_origin.x, light_origin.y, 10.0f);
-  v4 ambient = V4(0.5f, 0.5f, 0.5f, 0.6f);
-  f32 radius = 100.0f;
-  light_t light = {light_color, light_pos, ambient, radius};
+basis_t basis = {origin, x_axis, y_axis};
+v4 light_color = V4(1.0f, 1.0f, 1.0f, 1.0f);
+v3 light_pos = V3(light_origin.x, light_origin.y, 10.0f);
+v4 ambient = V4(0.5f, 0.5f, 0.5f, 0.6f);
+f32 radius = 100.0f;
+light_t light = {light_color, light_pos, ambient, radius};
 render_push_rotated_block(game_state->render_queue,
-                        &basis,
-                        V2(2, 2),
-                        COLOR(1, 1, 1, 1),
-                        &game_state->player_images[0],
-                        &game_state->player_normal,
-                        &light,
-                        1);
-                        */
+                    &basis,
+                    V2(2, 2),
+                    COLOR(1, 1, 1, 1),
+                    &game_state->player_images[0],
+                    &game_state->player_normal,
+                    &light,
+                    1);
 #endif
+                    */
 
-#if 0
-    // NOTE(Wes): TEST COLLIDER CODE
-    v2 *points1 = push_array(&game_state->frame_arena, 4, v2);
-    points1[0] = V2(20.0f, 20.0f);
-    points1[1] = V2(20.0f, 40.0f);
-    points1[2] = V2(40.0f, 40.0f);
-    points1[3] = V2(40.0f, 20.0f);
-    mesh_t mesh1 = {points1, 4};
-
-    v2 *points2 = push_array(&game_state->frame_arena, 4, v2);
-    points2[0] = V2(30.0f, 30.0f);
-    points2[1] = V2(30.0f, 50.0f);
-    points2[2] = V2(50.0f, 50.0f);
-    points2[3] = V2(50.0f, 30.0f);
-
-    mesh_t mesh2 = {points2, 4};
-
-#endif
-    v2 o = {{50.0f, 36.0f}};
-    v2 x = {{10.0f, 2.0f}};
+#if 1
+    v2 o = {{50.0f, 26.0f}};
+    v2 x = {{20.0f, 2.0f}};
     v2 y = v2_perp(x);
+    v2 o2 = {{70.0f, 30.0f}};
+    v2 x2 = {{10.0f, 0.0f}};
+    v2 y2 = v2_perp(x2);
     basis_t line1_basis = {o, x, y};
+    basis_t line2_basis = {o2, x2, y2};
 
-    v4 line_color = V4(1.0f, 1.0f, 0.0f, 1.0f);
-    if (collider_test(&basis, &line1_basis)) {
-        line_color = V4(1.0f, 0.0f, 1.0f, 1.0f);
+    v4 line_color1 = V4(1.0f, 1.0f, 0.0f, 1.0f);
+    v4 line_color2 = V4(1.0f, 0.0f, 0.0f, 1.0f);
+    if (collider_contains_point(&line1_basis, line2_basis.origin)) {
+        line_color2 = V4(1.0f, 0.0f, 1.0f, 1.0f);
     }
 
-    render_push_line(game_state->render_queue, &line1_basis, V2(0, 0), V2(0, 0), 5.0f, line_color);
-    render_push_line(game_state->render_queue, &basis, V2(0, 0), V2(0, 0), 5.0f, line_color);
+    render_push_line(game_state->render_queue, &line1_basis, V2(0, 0), V2(0, 0), 5.0f, line_color1);
+    render_push_line(game_state->render_queue, &line2_basis, V2(0, 0), V2(0, 0), 5.0f, line_color2);
+#endif
     render_draw_queue(game_state->render_queue, frame_buffer);
 
     output_sine_wave(game_state, audio);

@@ -69,3 +69,26 @@ b8 collider_test(basis_t *a, basis_t *b)
 
     return 1;
 }
+
+b8 collider_contains_point(basis_t *a, v2 p)
+{
+    // NOTE(Wes): Take the dot product of the point and the axis
+    // perpendicular to the one we are testing to see which side
+    // the point lies on.
+    v2 origin = a->origin;
+    v2 x_axis = a->x_axis;
+    v2 y_axis = a->y_axis;
+    p = v2_sub(p, origin);
+    f32 edge1 = v2_dot(p, v2_neg(y_axis));
+    p = v2_sub(p, x_axis);
+    f32 edge2 = v2_dot(p, x_axis);
+    p = v2_sub(p, y_axis);
+    f32 edge3 = v2_dot(p, y_axis);
+    p = v2_add(p, x_axis);
+    f32 edge4 = v2_dot(p, v2_neg(x_axis));
+    if (edge1 < 0 && edge2 < 0 && edge3 < 0 && edge4 < 0) {
+        return 1;
+    }
+
+    return 0;
+}
