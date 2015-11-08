@@ -58,8 +58,10 @@ static inline v4 read_frame_buffer_color(u32 buffer)
 
 static inline u32 color_frame_buffer_u32(v4 color)
 {
-    u32 result = ((u32)(color.r * 255.0f + 0.5f) & 0xFF) << 24 | ((u32)(color.g * 255.0f + 0.5f) & 0xFF) << 16 |
-                 ((u32)(color.b * 255.0f + 0.5f) & 0xFF) << 8 | ((u32)(color.a * 255.0f + 0.5f) & 0xFF);
+    u32 result = ((u32)(color.r * 255.0f + 0.5f) & 0xFF) << 24 | 
+                 ((u32)(color.g * 255.0f + 0.5f) & 0xFF) << 16 |
+                 ((u32)(color.b * 255.0f + 0.5f) & 0xFF) << 8 | 
+                 ((u32)(color.a * 255.0f + 0.5f) & 0xFF);
     return result;
 }
 
@@ -309,6 +311,28 @@ static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_fr
 
                 u32 *texel = &texture->data[texture_y * texture->w + texture_x];
 
+                // NOTE(Wes): Blend the closest 4 texels for better looking
+                // pixels. Bilinear blending.
+                v4 texel_a = read_image_color(*texel);
+                v4 texel_b = read_image_color(*(texel + 1));
+                v4 texel_c = read_image_color(*(texel + texture->w));
+                v4 texel_d = read_image_color(*(texel + texture->w + 1));
+
+                // NOTE(Wes): Perform gamma correction on pixels
+                // before blending them to ensure all math is done
+                // in linear space.
+                texel_a = srgb_to_linear(texel_a);
+                texel_b = srgb_to_linear(texel_b);
+                texel_c = srgb_to_linear(texel_c);
+                texel_d = srgb_to_linear(texel_d);
+
+                v4 blended_color =
+                    v4_lerp(v4_lerp(texel_a, texel_b, fraction_x), v4_lerp(texel_c, texel_d, fraction_x), fraction_y);
+                if (blended_color.a == 0.0f)
+                {
+                    continue;
+                }
+
                 // NOTE(Wes): If no normals are supplied then we use a default
                 //            normal that points straigh out the screen.
                 // TODO(Wes): Create light volumes out of convex shapes.
@@ -345,24 +369,6 @@ static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_fr
                     v3 intensity = v3_mul(v3_clamp(v3_add(diffuse, ambient_color), 0.0f, 1.0f), attenuation);
                     light_intensity = v3_add(light_intensity, intensity);
                 }
-
-                // NOTE(Wes): Blend the closest 4 texels for better looking
-                // pixels. Bilinear blending.
-                v4 texel_a = read_image_color(*texel);
-                v4 texel_b = read_image_color(*(texel + 1));
-                v4 texel_c = read_image_color(*(texel + texture->w));
-                v4 texel_d = read_image_color(*(texel + texture->w + 1));
-
-                // NOTE(Wes): Perform gamma correction on pixels
-                // before blending them to ensure all math is done
-                // in linear space.
-                texel_a = srgb_to_linear(texel_a);
-                texel_b = srgb_to_linear(texel_b);
-                texel_c = srgb_to_linear(texel_c);
-                texel_d = srgb_to_linear(texel_d);
-
-                v4 blended_color =
-                    v4_lerp(v4_lerp(texel_a, texel_b, fraction_x), v4_lerp(texel_c, texel_d, fraction_x), fraction_y);
 
                 u32 *fb_pixel = &fb_data[x + y * frame_buffer->w];
                 v4 dest_color = read_frame_buffer_color(*fb_pixel);

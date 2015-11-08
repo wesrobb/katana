@@ -9,6 +9,7 @@ GAME_TARGET = gg.so
 GAME_SRC = src/gg_unitybuild.c
 
 SDL_HEADERS = /usr/local/include/SDL2
+USR_LIB_DIR = /usr/local/lib
 SDL_LIB = SDL2
 
 BUILD_DIR = build
@@ -21,7 +22,7 @@ $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
 $(BIN_TARGET):
-	$(CC) $(BIN_SRC) -o $(BUILD_DIR)/$(BIN_TARGET) $(CFLAGS) -I$(SDL_HEADERS) -l$(SDL_LIB) $(DEFINES) $(DISABLED_WARNINGS)
+	$(CC) $(BIN_SRC) -o $(BUILD_DIR)/$(BIN_TARGET) $(CFLAGS) -I$(SDL_HEADERS) -L$(USR_LIB_DIR) -l$(SDL_LIB) $(DEFINES) $(DISABLED_WARNINGS)
 
 $(GAME_TARGET):
 	$(CC) $(GAME_SRC) -shared -o $(BUILD_DIR)/$(GAME_TARGET) $(CFLAGS) $(DEFINES) $(DISABLED_WARNINGS)

@@ -57,23 +57,13 @@ typedef struct {
 
 typedef enum {
     entity_type_player,
-    entity_type_teleporter,
 } entity_type_t;
 
 #define GG_MAX_HIT_ENTITIES 4
 typedef struct {
-    v2 katana_offset; // Offset from the players position depending on
-                      // which way the players is facing.
     u32 hit_entities[GG_MAX_HIT_ENTITIES];
     entity_anim_t walk;
-    entity_anim_t attack;
-    u32 teleporter_index;
-    b8 attacking;
 } entity_player_t;
-
-typedef struct {
-    image_t *image;
-} entity_teleporter_t;
 
 typedef struct {
     v2 position;
@@ -92,7 +82,6 @@ typedef struct {
     entity_type_t type;
     union {
         entity_player_t player;
-        entity_teleporter_t teleporter;
     };
 } entity_t;
 
@@ -143,14 +132,8 @@ typedef struct {
     world_t world;
     image_t background_image;
     image_t tile_image;
-    image_t player_images[6];
+    image_t player_image;
     image_t player_normal;
-    image_t player_attack_images[6];
-    image_t green_teleporter;
-    // TODO(Wes): Remove test image.
-    image_t test_image;
-    image_t test_image2;
-    image_t test_image3;
 
     memory_arena_t arena;
     memory_arena_t frame_arena;
