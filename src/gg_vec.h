@@ -3,6 +3,8 @@
 #include "gg_platform.h"
 #include "gg_math.h"
 
+#include <immintrin.h>
+
 // Note(Wes): Vectors
 typedef struct {
     i32 x;
@@ -90,7 +92,6 @@ typedef union {
             r, g, b, a                                                                                                 \
         }                                                                                                              \
     }
-#define V4_ZERO V4(0.0f, 0.0f, 0.0f, 0.0f)
 
 static inline v2 v2_add(v2 a, v2 b)
 {
@@ -155,7 +156,9 @@ static inline void v2_round2(v2 a, v2 b, v2i *a_result, v2i *b_result)
     lhs[2] = b.x;
     lhs[3] = b.y;
 
-    round4f(lhs, results);
+	__m128 packed_args = _mm_load_ps(lhs);
+	__m128 packed_result = _mm_round_ps(packed_args, _MM_FROUND_TO_NEAREST_INT);
+	_mm_store_ps(results, packed_result);
 
     a_result->x = (i32)results[0];
     a_result->y = (i32)results[1];
@@ -176,7 +179,9 @@ static inline void v2_floor2(v2 a, v2 b, v2i *a_result, v2i *b_result)
     lhs[2] = b.x;
     lhs[3] = b.y;
 
-    floor4f(lhs, results);
+	__m128 packed_args = _mm_load_ps(lhs);
+	__m128 packed_result = _mm_floor_ps(packed_args);
+	_mm_store_ps(results, packed_result);
 
     a_result->x = (i32)results[0];
     a_result->y = (i32)results[1];
@@ -197,7 +202,9 @@ static inline void v2_ceil2(v2 a, v2 b, v2i *a_result, v2i *b_result)
     lhs[2] = b.x;
     lhs[3] = b.y;
 
-    ceil4f(lhs, results);
+    __m128 packed_args = _mm_load_ps(lhs);
+	__m128 packed_result = _mm_ceil_ps(packed_args);
+	_mm_store_ps(results, packed_result);;
 
     a_result->x = (i32)results[0];
     a_result->y = (i32)results[1];
@@ -208,7 +215,7 @@ static inline void v2_ceil2(v2 a, v2 b, v2i *a_result, v2i *b_result)
 // Converts the specified vector into 1 on each axis preserving the sign.
 static inline v2i v2_sign(v2 src)
 {
-    v2i result = {};
+    v2i result = {0};
     if (src.x > 0.0f) {
         result.x = 1;
     } else if (src.x < 0.0f) {

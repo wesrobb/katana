@@ -1,5 +1,6 @@
 #pragma once
 
+#define GG_DLL
 #include "gg_platform.h"
 #include "gg_vec.h"
 
@@ -10,7 +11,7 @@ typedef struct {
     u8 *base;
 } memory_arena_t;
 
-void init_arena(memory_arena_t *arena, u32 size, u8 *base)
+static inline void init_arena(memory_arena_t *arena, u32 size, u8 *base)
 {
     arena->size = size;
     arena->base = base;
@@ -19,7 +20,7 @@ void init_arena(memory_arena_t *arena, u32 size, u8 *base)
 
 #define push_struct(arena, type) (type *) push_size(arena, sizeof(type))
 #define push_array(arena, count, type) (type *) push_size(arena, (count) * sizeof(type))
-void *push_size(memory_arena_t *arena, u32 size)
+static inline void *push_size(memory_arena_t *arena, u32 size)
 {
     assert((arena->index + size) <= arena->size);
     void *result = arena->base + arena->index;

@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\gg_unitybuild.c" />
+    <ClCompile Include="..\..\..\src\gg.c" />
+    <ClCompile Include="..\..\..\src\gg_collider.c" />
+    <ClCompile Include="..\..\..\src\gg_render.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\stb_image.h" />
+    <ClInclude Include="..\..\..\src\gg_collider.h" />
+    <ClInclude Include="..\..\..\src\gg_math.h" />
+    <ClInclude Include="..\..\..\src\gg_platform.h" />
+    <ClInclude Include="..\..\..\src\gg_render.h" />
+    <ClInclude Include="..\..\..\src\gg_types.h" />
+    <ClInclude Include="..\..\..\src\gg_vec.h" />
+  </ItemGroup>
+</Project>

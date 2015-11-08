@@ -2,6 +2,16 @@
 
 #include <stdint.h>
 
+#ifdef _MSC_VER
+#ifdef GG_DLL
+#define DLL_FN __declspec(dllexport)
+#else
+#define DLL_FN __declspec(dllimport)
+#endif
+#else
+#define DLL_FN
+#endif
+
 #define GG_TARGET_FPS 60
 
 #if GG_DEBUG
@@ -17,8 +27,8 @@
 #define is_aligned(POINTER, BYTE_COUNT)                                        \
     (((uintptr_t)(const void *)(POINTER)) % (BYTE_COUNT) == 0)
 
-#define min(a, b) a < b ? a : b
-#define max(a, b) a > b ? a : b
+#define gg_min(a, b) a < b ? a : b
+#define gg_max(a, b) a > b ? a : b
 
 typedef unsigned char b8;
 typedef int8_t i8;
@@ -33,10 +43,10 @@ typedef float f32;
 typedef double f64;
 
 typedef struct {
-    void *transient_store;
+    u8 *transient_store;
     u64 transient_store_size;
 
-    void *permanent_store;
+    u8 *permanent_store;
     u64 permanent_store_size;
 
     b8 is_initialized;
@@ -116,20 +126,20 @@ typedef struct {
 
 typedef struct {
     void *contents;
-    u32 size;
+    i64 size;
     b8 success;
-} mapped_file_t;
+} loaded_file_t;
 
-typedef mapped_file_t (*map_file_fn)(const char *filename);
-typedef void (*unmap_file_fn)(mapped_file_t *);
+typedef loaded_file_t (*load_file_fn)(const char *filename);
+typedef void (*unload_file_fn)(loaded_file_t *);
 
 // TODO(Wes): Pass these once during game_init or something.
 typedef struct {
-    map_file_fn map_file;
-    unmap_file_fn unmap_file;
+    load_file_fn load_file;
+    unload_file_fn unload_file;
 } game_callbacks_t;
 
-void game_update_and_render(game_memory_t *memory,
+DLL_FN void game_update_and_render(game_memory_t *memory,
                             game_frame_buffer_t *frame_buffer,
                             game_audio_t *audio,
                             game_input_t *input,

@@ -118,7 +118,7 @@ static ray_cast_result ray_cast_horizontal(v2 origin, f32 end_x, tilemap_t *tile
 
 static u32 get_next_entity(entity_t *entities)
 {
-    static const entity_t zero_entity = {};
+    static const entity_t zero_entity = {0};
     for (u32 i = 1; i < GG_MAX_ENTITIES; ++i) {
         entity_t *entity = &entities[i];
         if (!entity->exists) {
@@ -133,7 +133,7 @@ static u32 get_next_entity(entity_t *entities)
 
 static void free_entity(entity_t *entities, u32 index)
 {
-    static const entity_t zero_entity = {};
+    static const entity_t zero_entity = {0};
     assert(index < GG_MAX_ENTITIES);
     entities[index] = zero_entity;
 }
@@ -172,7 +172,7 @@ static f32 test_wall(f32 test_x,
 static void update_entities(game_state_t *game_state, game_input_t *input)
 {
     world_t *world = &game_state->world;
-    v2 new_accels[GG_MAX_ENTITIES] = {};
+    v2 new_accels[GG_MAX_ENTITIES] = {0};
 
     for (u32 i = 0; i < GG_MAX_CONTROLLERS; ++i) {
         u32 entity_index = world->controlled_entities[i];
@@ -230,7 +230,7 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
             }
 #endif
             // Move
-            v2 left_stick = {};
+            v2 left_stick = {0};
             if (controller->is_analog) {
                 left_stick.x = controller->left_stick_x;
                 left_stick.y = controller->left_stick_y;
@@ -333,15 +333,15 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
     }
 }
 
-static image_t load_image(const char *path, map_file_fn map_file)
+static image_t load_image(const char *path, load_file_fn load_file)
 {
     // TODO(Wes): Add error checking and handle allocation on behalf of stb.
-    image_t result = {};
-    mapped_file_t mapped_file = map_file(path);
+    image_t result = {0};
+    loaded_file_t loaded_file = load_file(path);
     int unused = 0;
     int required_components = 4; // We always want RGBA.
     result.data = (u32 *)stbi_load_from_memory(
-        mapped_file.contents, mapped_file.size, (int *)&result.w, (int *)&result.h, &unused, required_components);
+        loaded_file.contents, loaded_file.size, (int *)&result.w, (int *)&result.h, &unused, required_components);
 
     // NOTE(Wes): Pre-multiply alpha.
     for (u32 y = 0; y < result.h; y++) {
@@ -368,7 +368,7 @@ static image_t load_image(const char *path, map_file_fn map_file)
     return result;
 }
 
-void game_update_and_render(game_memory_t *memory,
+DLL_FN void game_update_and_render(game_memory_t *memory,
                             game_frame_buffer_t *frame_buffer,
                             game_audio_t *audio,
                             game_input_t *input,
@@ -421,10 +421,10 @@ void game_update_and_render(game_memory_t *memory,
         game_state->world.tilemap.tiles_wide = 32;
         game_state->world.tilemap.tiles_high = 18;
 
-        game_state->background_image = load_image("data/background/Bg 1.png", callbacks->map_file);
-        game_state->tile_image = load_image("data/tiles/Box 01.png", callbacks->map_file);
-        game_state->player_image = load_image("data/player/walk_with_sword/1.png", callbacks->map_file);
-        game_state->player_normal = load_image("data/sphere_normals.png", callbacks->map_file);
+        game_state->background_image = load_image("data/background/Bg 1.png", callbacks->load_file);
+        game_state->tile_image = load_image("data/tiles/Box 01.png", callbacks->load_file);
+        game_state->player_image = load_image("data/player/walk_with_sword/1.png", callbacks->load_file);
+        game_state->player_normal = load_image("data/sphere_normals.png", callbacks->load_file);
 
         init_arena(&game_state->arena,
                    memory->permanent_store_size - sizeof(game_state_t),
