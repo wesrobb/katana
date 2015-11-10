@@ -333,6 +333,9 @@ static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_fr
                     continue;
                 }
 
+                v3 light_intensity = V3(1.0f, 1.0f, 1.0f);
+
+#if 0
                 // NOTE(Wes): If no normals are supplied then we use a default
                 //            normal that points straigh out the screen.
                 // TODO(Wes): Create light volumes out of convex shapes.
@@ -369,6 +372,7 @@ static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_fr
                     v3 intensity = v3_mul(v3_clamp(v3_add(diffuse, ambient_color), 0.0f, 1.0f), attenuation);
                     light_intensity = v3_add(light_intensity, intensity);
                 }
+#endif
 
                 u32 *fb_pixel = &fb_data[x + y * frame_buffer->w];
                 v4 dest_color = read_frame_buffer_color(*fb_pixel);

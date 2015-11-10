@@ -37,8 +37,10 @@ static void output_sine_wave(game_state_t *game_state, game_audio_t *audio)
 static unsigned char *get_tile(tilemap_t *tilemap, u32 x, u32 y)
 {
     assert(tilemap);
-    assert(x < tilemap->tiles_wide);
-    assert(y < tilemap->tiles_high);
+    if(x >= tilemap->tiles_wide || y >= tilemap->tiles_high) {
+        return 0;
+    }
+
     return &tilemap->tiles[x + y * tilemap->tiles_wide];
 }
 
@@ -179,6 +181,7 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         if (entity_index != 0) {
             entity_t *entity = &world->entities[entity_index];
             if (!entity->exists) {
+                continue;
             }
             game_controller_input_t *controller = &input->controllers[i];
 #if 0
@@ -309,7 +312,7 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         for (u32 y = min_tile_y; y != max_tile_y; y++) {
             for (u32 x = min_tile_x; x != max_tile_x; x++) {
                 unsigned char *tile = get_tile(tilemap, x, y);
-                if (!is_tile_empty(tile)) {
+                if (tile && !is_tile_empty(tile)) {
                     v2 min_corner = V2(x, y);
                     v2 max_corner = V2(x + tilemap->tile_size.x, x + tilemap->tile_size.y); 
                     t_min = test_wall(new_entity_pos.x,

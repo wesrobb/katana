@@ -277,9 +277,9 @@ static void osx_copy_game_memory(game_memory_t *dst, game_memory_t *src)
     memcpy(dst->permanent_store, src->permanent_store, src->permanent_store_size);
 }
 
-static mapped_file_t osx_map_file(const char *path)
+static loaded_file_t osx_load_file(const char *path)
 {
-    mapped_file_t result = {};
+    loaded_file_t result = {};
     int fd = open(path, O_RDONLY);
     if (fd == -1) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to open file %s", path);
@@ -302,10 +302,10 @@ static mapped_file_t osx_map_file(const char *path)
     return result;
 }
 
-static void osx_unmap_file(mapped_file_t *mapped_file)
+static void osx_unload_file(loaded_file_t *loaded_file)
 {
-    assert(mapped_file);
-    munmap(mapped_file->contents, mapped_file->size);
+    assert(loaded_file);
+    munmap(loaded_file->contents, loaded_file->size);
 }
 
 int main(void)
@@ -400,8 +400,8 @@ int main(void)
     game_record.memory = osx_allocate_game_memory((void *)Terabytes(4));
 
     game_callbacks_t callbacks = {};
-    callbacks.map_file = &osx_map_file;
-    callbacks.unmap_file = &osx_unmap_file;
+    callbacks.load_file = &osx_load_file;
+    callbacks.unload_file = &osx_unload_file;
 
     u64 last_time = SDL_GetPerformanceCounter();
     u64 perf_freq = SDL_GetPerformanceFrequency();
