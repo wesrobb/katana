@@ -308,6 +308,25 @@ static void osx_unload_file(loaded_file_t *loaded_file)
     munmap(loaded_file->contents, loaded_file->size);
 }
 
+static void osx_handle_debug_counters(game_memory_t *memory)
+{
+#ifdef GG_INTERNAL
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "DEBUG COUNTERS");
+    for (u32 i = 0; i < ARRAY_LEN(memory->counters); ++i) {
+        dbg_counter_t *counter = &memory->counters[i];
+        if (counter->hits)
+        {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tcy %"PRIu64", h %u, cy/h %"PRIu64, 
+                        counter->cycles, 
+                        counter->hits,
+                        counter->cycles / counter->hits);
+            counter->cycles = 0;
+            counter->hits = 0;
+        }
+    }
+#endif
+}
+
 int main(void)
 {
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
@@ -488,6 +507,7 @@ int main(void)
         frame_buffer.pitch /= sizeof(u32);
 
         game.update_and_render_fn(&game_memory, &frame_buffer, &audio, new_input, &output, &callbacks);
+        osx_handle_debug_counters(&game_memory);
         SDL_UnlockTexture(texture);
 
         SDL_RenderCopy(renderer, texture, 0, 0);

@@ -30,6 +30,25 @@
 #define gg_min(a, b) a < b ? a : b
 #define gg_max(a, b) a > b ? a : b
 
+#define ARRAY_LEN(array) (sizeof((array))/sizeof((array)[0]))
+
+// RDTSC
+#if defined(__i386__)
+static __inline__ unsigned long long rdtsc(void)
+{
+    unsigned long long int x;
+    __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
+    return x;
+}
+#elif defined(__x86_64__)
+static __inline__ unsigned long long rdtsc(void)
+{
+    unsigned hi, lo;
+    __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
+    return ( (unsigned long long)lo)|( ((unsigned long long)hi)<<32 );
+}
+#endif
+
 typedef unsigned char b8;
 typedef int8_t i8;
 typedef uint8_t u8;
@@ -42,6 +61,30 @@ typedef uint64_t u64;
 typedef float f32;
 typedef double f64;
 
+enum {
+    dbg_counter_game_update_and_render,
+    dbg_counter_render_draw_queue,
+    dbg_counter_render_rotated_block,
+    dbg_counter_count
+};
+
+#ifdef GG_INTERNAL
+typedef struct {
+    u64 cycles;
+    u32 hits;
+} dbg_counter_t;
+
+#define START_COUNTER(ID) u64 start_counter_##ID = rdtsc();
+#define END_COUNTER(ID) dbg_global_memory->counters[dbg_counter_##ID].cycles += rdtsc() - start_counter_##ID; \
+                        ++dbg_global_memory->counters[dbg_counter_##ID].hits;
+
+#else
+
+#define START_COUNTER(ID)
+#define END_COUNTER(ID)
+
+#endif
+
 typedef struct {
     u8 *transient_store;
     u64 transient_store_size;
@@ -50,7 +93,15 @@ typedef struct {
     u64 permanent_store_size;
 
     b8 is_initialized;
+
+#ifdef GG_INTERNAL
+    dbg_counter_t counters[dbg_counter_count];
+#endif
 } game_memory_t;
+
+#ifdef GG_INTERNAL
+extern game_memory_t *dbg_global_memory;
+#endif
 
 typedef struct {
     u32 *data; // Always 4bpp. RR GG BB AA
@@ -140,8 +191,8 @@ typedef struct {
 } game_callbacks_t;
 
 DLL_FN void game_update_and_render(game_memory_t *memory,
-                            game_frame_buffer_t *frame_buffer,
-                            game_audio_t *audio,
-                            game_input_t *input,
-                            game_output_t *output,
-                            game_callbacks_t *callbacks);
+                                   game_frame_buffer_t *frame_buffer,
+                                   game_audio_t *audio,
+                                   game_input_t *input,
+                                   game_output_t *output,
+                                   game_callbacks_t *callbacks);

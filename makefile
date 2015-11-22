@@ -1,6 +1,6 @@
 CC = clang
-CFLAGS = -Wall -Werror -std=c11 -O0 -g -msse4 -fPIC -ffast-math -Wno-unused-variable -Wno-missing-braces
-DEFINES = -DGG_DEBUG 
+CFLAGS = -Wall -Werror -std=c11 -O2 -g -msse4 -fPIC -ffast-math -Wno-unused-variable -Wno-missing-braces
+DEFINES = -DGG_DEBUG -DGG_INTERNAL 
 DISABLED_WARNINGS = -Wno-unused-function
 
 BIN_TARGET = gg

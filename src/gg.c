@@ -309,6 +309,7 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         f32 t_min = 1.0f; // Full movement has occurred at time = 1.0f.  
         // NOTE(Wes): We use != to check against the max tile to get around integer overflow
         //            when reaching edge of the tilemap.
+#if 0   
         for (u32 y = min_tile_y; y != max_tile_y; y++) {
             for (u32 x = min_tile_x; x != max_tile_x; x++) {
                 unsigned char *tile = get_tile(tilemap, x, y);
@@ -326,8 +327,10 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
                 }
             }
         }
+#endif
 
-        entity->position = v2_add(old_pos, v2_mul(pos_delta, t_min));
+        //entity->position = v2_add(old_pos, v2_mul(pos_delta, t_min));
+        entity->position = new_entity_pos;
 
         // Track entity positions for the camera
         if (entity->type == entity_type_player) {
@@ -371,6 +374,7 @@ static image_t load_image(const char *path, load_file_fn load_file)
     return result;
 }
 
+game_memory_t *dbg_global_memory;
 DLL_FN void game_update_and_render(game_memory_t *memory,
                             game_frame_buffer_t *frame_buffer,
                             game_audio_t *audio,
@@ -378,9 +382,8 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
                             game_output_t *output,
                             game_callbacks_t *callbacks)
 {
-    if (!memory) {
-        return;
-    }
+    dbg_global_memory = memory;
+    START_COUNTER(game_update_and_render);
 
     assert(sizeof(game_state_t) <= memory->permanent_store_size);
     game_state_t *game_state = (game_state_t *)memory->permanent_store;
@@ -648,4 +651,6 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
 
     // NOTE(Wes): Free transient frame memory.
     game_state->frame_arena.index = 0;
+
+    END_COUNTER(game_update_and_render);
 }

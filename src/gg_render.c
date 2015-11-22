@@ -208,6 +208,7 @@ static void render_block(v2 pos, v2 size, v4 color, camera_t *cam, game_frame_bu
 
 static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer)
 {
+    START_COUNTER(render_rotated_block);
     basis_t basis = cmd->header.basis;
 
     v2 origin = v2_mul(basis.origin, cam->units_to_pixels);
@@ -386,6 +387,7 @@ static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_fr
             }
         }
     }
+    END_COUNTER(render_rotated_block);
 }
 
 static void render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer)
@@ -630,6 +632,7 @@ render_queue_t *render_alloc_queue(memory_arena_t *arena, u32 max_render_queue_s
 
 void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer)
 {
+    START_COUNTER(render_draw_queue);
     for (u32 address = 0; address < queue->index;) {
         render_cmd_header_t *header = (render_cmd_header_t *)(queue->base + address);
         switch (header->type) {
@@ -658,4 +661,5 @@ void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer)
     }
 
     queue->index = 0;
+    END_COUNTER(render_draw_queue);
 }
