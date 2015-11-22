@@ -65,6 +65,8 @@ enum {
     dbg_counter_game_update_and_render,
     dbg_counter_render_draw_queue,
     dbg_counter_render_rotated_block,
+    dbg_counter_test_pixel,
+    dbg_counter_fill_pixel,
     dbg_counter_count
 };
 

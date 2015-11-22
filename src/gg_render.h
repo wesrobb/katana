@@ -30,8 +30,6 @@ void render_push_rotated_block(render_queue_t *queue,
                                light_t *lights,
                                int num_lights);
 
-void render_push_image(render_queue_t *queue, v2 pos, v2 size, image_t *image, b8 flip_x);
-
 void render_push_line(render_queue_t *queue, basis_t *basis, v2 start, v2 end, f32 width, v4 color);
 
 // Allocates a render queue.
