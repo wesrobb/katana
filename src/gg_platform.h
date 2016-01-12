@@ -65,8 +65,7 @@ enum {
     dbg_counter_game_update_and_render,
     dbg_counter_render_draw_queue,
     dbg_counter_render_rotated_block,
-    dbg_counter_test_pixel,
-    dbg_counter_fill_pixel,
+    dbg_counter_process_pixel,
     dbg_counter_count
 };
 
@@ -76,9 +75,11 @@ typedef struct {
     u32 hits;
 } dbg_counter_t;
 
-#define START_COUNTER(ID) u64 start_counter_##ID = rdtsc();
-#define END_COUNTER(ID) dbg_global_memory->counters[dbg_counter_##ID].cycles += rdtsc() - start_counter_##ID; \
-                        ++dbg_global_memory->counters[dbg_counter_##ID].hits;
+#define START_COUNTER(id) u64 start_counter_##id = rdtsc();
+#define END_COUNTER(id) dbg_global_memory->counters[dbg_counter_##id].cycles += rdtsc() - start_counter_##id; \
+                      ++dbg_global_memory->counters[dbg_counter_##id].hits;
+#define END_COUNTER_N(id, count) dbg_global_memory->counters[dbg_counter_##id].cycles += rdtsc() - start_counter_##id; \
+                                 dbg_global_memory->counters[dbg_counter_##id].hits += (count);
 
 #else
 

@@ -2,6 +2,8 @@
 #include "gg_types.h"
 #include "gg_vec.h"
 
+#include "xmmintrin.h"
+
 typedef enum {
     render_type_clear,
     render_type_block,
@@ -197,7 +199,16 @@ static void render_block(v2 pos, v2 size, v4 color, camera_t *cam, game_frame_bu
     }
 }
 
-static void render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer)
+#define m128i_access(a, i) ((u32*)&a)[i]
+#define m128_access(a, i) ((f32*)&a)[i]
+#define m128_access8(a, i) ((u8*)&a)[i]
+
+// TODO(Wes): Remove this!
+#include <stdio.h>
+
+static void render_image(render_cmd_block_t *cmd, 
+                         camera_t *cam, 
+                         game_frame_buffer_t *frame_buffer)
 {
     START_COUNTER(render_rotated_block);
     basis_t basis = cmd->header.basis;
@@ -258,110 +269,234 @@ static void render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buff
     f32 inv_y_len_sq = 1.0f / v2_len_sq(y_axis);
     v2 n_x_axis = v2_mul(x_axis, inv_x_len_sq);
     v2 n_y_axis = v2_mul(y_axis, inv_y_len_sq);
+    __m128 n_x_axis_x4 = _mm_set1_ps(n_x_axis.x); 
+    __m128 n_x_axis_y4 = _mm_set1_ps(n_x_axis.y); 
+    __m128 n_y_axis_x4 = _mm_set1_ps(n_y_axis.x); 
+    __m128 n_y_axis_y4 = _mm_set1_ps(n_y_axis.y); 
 
     image_t *texture = cmd->image;
+    u32 *texture_data = texture->data;
+    u32 texture_width = texture->w;
+    u32 texture_height = texture->h;
+    __m128i texture_width4 = _mm_set1_epi32(texture_width);
+    __m128i texture_height4 = _mm_set1_epi32(texture_height);
     image_t *normals = cmd->normals;
     v4 tint = cmd->tint;
 
+    __m128 zero4 = _mm_setzero_ps();
+    __m128 one4 = _mm_set1_ps(1.0f);
+    __m128i zero4i = _mm_setzero_si128();
+    __m128i one4i = _mm_set1_epi32(1);
+
+    __m128 t_width_m2 = _mm_set1_ps(texture_width - 2.0f);
+    __m128 t_height_m2 = _mm_set1_ps(texture_height - 2.0f);
+
+    __m128i texel_mask = _mm_set1_epi32(0x000000FF);
+    __m128 inv_255 = _mm_set1_ps(1.0f / 255.0f);
+    __m128 two_fifty_five4 = _mm_set1_ps(255.0f);
+
+    __m128i first_mask  = _mm_setr_epi32(0xFFFFFFFF, 0, 0, 0);
+    __m128i second_mask = _mm_setr_epi32(0, 0xFFFFFFFF, 0, 0);
+    __m128i third_mask  = _mm_setr_epi32(0, 0, 0xFFFFFFFF, 0);
+    __m128i fourth_mask = _mm_setr_epi32(0, 0, 0, 0xFFFFFFFF);
+
     u32 *fb_data = frame_buffer->data;
+    START_COUNTER(process_pixel);
     for (i32 y = y_min; y <= y_max; y++) {
-        for (i32 x = x_min; x <= x_max; x++) {
-            START_COUNTER(test_pixel);
-            // NOTE(Wes): Take the dot product of the point and the axis
-            // perpendicular to the one we are testing to see which side
-            // the point lies on. This code moves the point p in an
-            // anti-clockwise direction.
-            v2 p_orig = v2_sub(V2(x, y), origin);
-            f32 u = v2_dot(p_orig, n_x_axis);
-            f32 v = v2_dot(p_orig, n_y_axis);
-            if (u >= 0.0f &&
-                u <= 1.0f &&
-                v >= 0.0f &&
-                v <= 1.0f) {
-                START_COUNTER(fill_pixel);
-                // TODO(Wes): Actually clamp the texels for subpixel rendering
-                // rather than just shortening the texture.
-                f32 texel_x = 1.0f + (u * (f32)(texture->w - 3)) + 0.5f;
-                f32 texel_y = 1.0f + (v * (f32)(texture->h - 3)) + 0.5f;
+        for (i32 x = x_min; x <= x_max; x+=4) {
+            // Calculate pixel origin
+            __m128 p_orig_x4 = _mm_setr_ps(x - origin.x, x - origin.x + 1, x - origin.x + 2, x - origin.x + 3);
+            __m128 p_orig_y4 = _mm_set1_ps(y - origin.y);
 
-                u32 texture_x = (u32)texel_x;
-                u32 texture_y = (u32)texel_y;
+            // Calculate texture coord
+            __m128 u4 = _mm_add_ps(_mm_mul_ps(p_orig_x4, n_x_axis_x4), _mm_mul_ps(p_orig_y4, n_x_axis_y4));
+            __m128 v4 = _mm_add_ps(_mm_mul_ps(p_orig_x4, n_y_axis_x4), _mm_mul_ps(p_orig_y4, n_y_axis_y4));
 
-                // NOTE(Wes): Get the rounded off value of the texel.
-                f32 fx = texel_x - texture_x;
-                f32 fy = texel_y - texture_y;
-                f32 inv_fx = 1.0f - fx;
-                f32 inv_fy = 1.0f - fy;
+            // Ensure texture coord is within bounds. Save result to mask.
+            __m128 u4_ge_zero = _mm_cmpge_ps(u4, zero4);
+            __m128 u4_le_one = _mm_cmple_ps(u4, one4);
+            __m128 v4_ge_zero = _mm_cmpge_ps(v4, zero4);
+            __m128 v4_le_one = _mm_cmple_ps(v4, one4);
+            __m128i write_mask = _mm_castps_si128(
+                                 _mm_and_ps(_mm_and_ps(u4_ge_zero, u4_le_one), 
+                                            _mm_and_ps(v4_ge_zero, v4_le_one)));
 
-                texture_x = kclamp(texture_x, 0, texture->w - 1);
-                texture_y = kclamp(texture_y, 0, texture->h - 1);
+            // Clamp texture coord
+            u4 = _mm_max_ps(_mm_min_ps(u4, one4), zero4);
+            v4 = _mm_max_ps(_mm_min_ps(v4, one4), zero4);
 
-                u32 *texel = &texture->data[texture_y * texture->w + texture_x];
+            // Calculate the actual texel position in the texture
+            // TODO(Wes): Formalize texture boundaries
+            __m128 texel_x4 = _mm_mul_ps(u4, t_width_m2);
+            __m128 texel_y4 = _mm_mul_ps(v4, t_height_m2);
 
-                // NOTE(Wes): Blend the closest 4 texels for better looking
-                // pixels. Bilinear blending.
-                u32 texel_a = *texel;
-                f32 texel_a_r = ((texel_a >> 0) & 0xff) / 255.0f;
-                f32 texel_a_g = ((texel_a >> 8) & 0xff) / 255.0f;
-                f32 texel_a_b = ((texel_a >> 16) & 0xff) / 255.0f;
-                f32 texel_a_a = ((texel_a >> 24) & 0xff) / 255.0f;
+            // Calculate the blend factor for surrounding pixels 
+            __m128i texture_x4 = _mm_cvttps_epi32(texel_x4); 
+            __m128i texture_y4 = _mm_cvttps_epi32(texel_y4); 
+            __m128 subpixel_x4 = _mm_sub_ps(texel_x4, _mm_cvtepi32_ps(texture_x4));
+            __m128 subpixel_y4 = _mm_sub_ps(texel_y4, _mm_cvtepi32_ps(texture_y4));
+            __m128 inv_subpixel_x4 = _mm_sub_ps(one4, subpixel_x4);
+            __m128 inv_subpixel_y4 = _mm_sub_ps(one4, subpixel_y4);
 
-                u32 texel_b = *(texel + 1);
-                f32 texel_b_r = ((texel_b >> 0) & 0xff) / 255.0f;
-                f32 texel_b_g = ((texel_b >> 8) & 0xff) / 255.0f;
-                f32 texel_b_b = ((texel_b >> 16) & 0xff) / 255.0f;
-                f32 texel_b_a = ((texel_b >> 24) & 0xff) / 255.0f;
+            texture_x4 = _mm_max_epi32(_mm_min_epi32(texture_x4, _mm_sub_epi32(texture_width4, one4i)), zero4i);
+            texture_y4 = _mm_max_epi32(_mm_min_epi32(texture_y4, _mm_sub_epi32(texture_height4, one4i)), zero4i);
 
-                u32 texel_c = *(texel + texture->w);
-                f32 texel_c_r = ((texel_c >> 0) & 0xff) / 255.0f;
-                f32 texel_c_g = ((texel_c >> 8) & 0xff) / 255.0f;
-                f32 texel_c_b = ((texel_c >> 16) & 0xff) / 255.0f;
-                f32 texel_c_a = ((texel_c >> 24) & 0xff) / 255.0f;
+            // TODO(Wes): This is SSE4. We need to find a way to do this mul in SSE2.
+            __m128i texture_index = _mm_add_epi32(texture_x4, _mm_mullo_epi32(texture_width4, texture_y4));
 
-                u32 texel_d = *(texel + texture->w + 1);
-                f32 texel_d_r = ((texel_d >> 0) & 0xff) / 255.0f;
-                f32 texel_d_g = ((texel_d >> 8) & 0xff) / 255.0f;
-                f32 texel_d_b = ((texel_d >> 16) & 0xff) / 255.0f;
-                f32 texel_d_a = ((texel_d >> 24) & 0xff) / 255.0f;
+            u32 texture_index0 = m128i_access(texture_index, 0);
+            u32 texture_index1 = m128i_access(texture_index, 1);
+            u32 texture_index2 = m128i_access(texture_index, 2);
+            u32 texture_index3 = m128i_access(texture_index, 3);
+            u32 *base_addr1 = &texture_data[texture_index0];
+            u32 *base_addr2 = &texture_data[texture_index1];
+            u32 *base_addr3 = &texture_data[texture_index2];
+            u32 *base_addr4 = &texture_data[texture_index3];
 
-                // Optimized Linear Blend
-                f32 c0 = fx * fy;
-                f32 c1 = inv_fx * fy;
-                f32 c2 = fx * inv_fy;
-                f32 c3 = inv_fx * inv_fy;
-                f32 blended_r = texel_d_r * c0 + texel_c_r * c1 + texel_b_r * c2 + texel_a_r * c3; 
-                f32 blended_g = texel_d_g * c0 + texel_c_g * c1 + texel_b_g * c2 + texel_a_g * c3; 
-                f32 blended_b = texel_d_b * c0 + texel_c_b * c1 + texel_b_b * c2 + texel_a_b * c3; 
-                f32 blended_a = texel_d_a * c0 + texel_c_a * c1 + texel_b_a * c2 + texel_a_a * c3; 
+            __m128i sample_a = _mm_setr_epi32(*base_addr1, 
+                                              *base_addr2, 
+                                              *base_addr3, 
+                                              *base_addr4); 
+            __m128i sample_b = _mm_setr_epi32(*(base_addr1 + 1), 
+                                              *(base_addr2 + 1), 
+                                              *(base_addr3 + 1), 
+                                              *(base_addr4 + 1));
+            __m128i sample_c = _mm_setr_epi32(*(base_addr1 + texture_width), 
+                                              *(base_addr2 + texture_width), 
+                                              *(base_addr3 + texture_width), 
+                                              *(base_addr4 + texture_width));
+            __m128i sample_d = _mm_setr_epi32(*(base_addr1 + texture_width + 1), 
+                                              *(base_addr2 + texture_width + 1), 
+                                              *(base_addr3 + texture_width + 1), 
+                                              *(base_addr4 + texture_width + 1));
 
-                u32 *fb_pixel = &fb_data[x + y * frame_buffer->w];
-                u32 source = *fb_pixel;
+            // Pack the 4 samples into 4 texels (rrrr, gggg, bbbb, aaaa)
+            __m128i texel_a_r4i = _mm_and_si128(texel_mask, sample_a);
+            __m128i texel_a_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_a, 8));
+            __m128i texel_a_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_a, 16));
+            __m128i texel_a_a4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_a, 24));
 
-                f32 dest_r = ((source >> 24) & 0xFF) / 255.0f;
-                f32 dest_g = ((source >> 16) & 0xFF) / 255.0f;
-                f32 dest_b = ((source >> 8)  & 0xFF) / 255.0f;
-                f32 dest_a = ((source >> 0)  & 0xFF) / 255.0f;
+            __m128i texel_b_r4i = _mm_and_si128(texel_mask, sample_b);
+            __m128i texel_b_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_b, 8));
+            __m128i texel_b_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_b, 16));
+            __m128i texel_b_a4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_b, 24));
 
-                f32 inv_alpha = 1.0f - blended_a;
-                dest_r = dest_r * inv_alpha + blended_r * blended_a;
-                dest_b = dest_b * inv_alpha + blended_b * blended_a;
-                dest_g = dest_g * inv_alpha + blended_g * blended_a;
-                dest_a = dest_a * inv_alpha + blended_a * blended_a;
+            __m128i texel_c_r4i = _mm_and_si128(texel_mask, sample_c);
+            __m128i texel_c_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_c, 8));
+            __m128i texel_c_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_c, 16));
+            __m128i texel_c_a4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_c, 24));
 
-                *fb_pixel = ((u32)(dest_r * 255.0f + 0.5f) & 0xFF) << 24 | 
-                             ((u32)(dest_g * 255.0f + 0.5f) & 0xFF) << 16 |
-                             ((u32)(dest_b * 255.0f + 0.5f) & 0xFF) << 8 | 
-                             ((u32)(dest_a * 255.0f + 0.5f) & 0xFF);
+            __m128i texel_d_r4i = _mm_and_si128(texel_mask, sample_d);
+            __m128i texel_d_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_d, 8));
+            __m128i texel_d_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_d, 16));
+            __m128i texel_d_a4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_d, 24));
 
-                END_COUNTER(fill_pixel);
-            }
-            END_COUNTER(test_pixel);
+            // Convert packed texels from i8 in range 0-255 to f32 in range 0-1.
+            __m128 texel_a_r4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_a_r4i), inv_255);
+            __m128 texel_a_g4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_a_g4i), inv_255);
+            __m128 texel_a_b4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_a_b4i), inv_255);
+            __m128 texel_a_a4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_a_a4i), inv_255);
+            
+            __m128 texel_b_r4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_b_r4i), inv_255);
+            __m128 texel_b_g4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_b_g4i), inv_255);
+            __m128 texel_b_b4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_b_b4i), inv_255);
+            __m128 texel_b_a4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_b_a4i), inv_255);
+            
+            __m128 texel_c_r4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_c_r4i), inv_255);
+            __m128 texel_c_g4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_c_g4i), inv_255);
+            __m128 texel_c_b4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_c_b4i), inv_255);
+            __m128 texel_c_a4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_c_a4i), inv_255);
+            
+            __m128 texel_d_r4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_d_r4i), inv_255);
+            __m128 texel_d_g4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_d_g4i), inv_255);
+            __m128 texel_d_b4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_d_b4i), inv_255);
+            __m128 texel_d_a4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_d_a4i), inv_255);
+
+            // Optimized linear blend
+            __m128 c0 = _mm_mul_ps(subpixel_x4, subpixel_y4);
+            __m128 c1 = _mm_mul_ps(inv_subpixel_x4, subpixel_y4);
+            __m128 c2 = _mm_mul_ps(subpixel_x4, inv_subpixel_y4);
+            __m128 c3 = _mm_mul_ps(inv_subpixel_x4, inv_subpixel_y4);
+            __m128 blended_r4 = _mm_add_ps(_mm_add_ps(_mm_mul_ps(texel_d_r4, c0), _mm_mul_ps(texel_c_r4, c1)), 
+                                           _mm_add_ps(_mm_mul_ps(texel_b_r4, c2), _mm_mul_ps(texel_a_r4, c3)));
+            __m128 blended_g4 = _mm_add_ps(_mm_add_ps(_mm_mul_ps(texel_d_g4, c0), _mm_mul_ps(texel_c_g4, c1)), 
+                                           _mm_add_ps(_mm_mul_ps(texel_b_g4, c2), _mm_mul_ps(texel_a_g4, c3)));
+            __m128 blended_b4 = _mm_add_ps(_mm_add_ps(_mm_mul_ps(texel_d_b4, c0), _mm_mul_ps(texel_c_b4, c1)), 
+                                           _mm_add_ps(_mm_mul_ps(texel_b_b4, c2), _mm_mul_ps(texel_a_b4, c3)));
+            __m128 blended_a4 = _mm_add_ps(_mm_add_ps(_mm_mul_ps(texel_d_a4, c0), _mm_mul_ps(texel_c_a4, c1)), 
+                                           _mm_add_ps(_mm_mul_ps(texel_b_a4, c2), _mm_mul_ps(texel_a_a4, c3)));
+
+            __m128i *fb_pixel = (__m128i*)&fb_data[x + y * frame_buffer->w];
+            // TODO(Wes): Align our framebuffer on the 16 byte boundary
+            __m128i fb_pixel4 = _mm_loadu_si128(fb_pixel);
+
+            // Convert current value in framebuffer to rrrr, gggg, bbbb, aaaa
+            __m128i fb_pixel_a4i = _mm_and_si128(texel_mask, fb_pixel4);
+            __m128i fb_pixel_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel4, 8));
+            __m128i fb_pixel_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel4, 16));
+            __m128i fb_pixel_r4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel4, 24));
+
+            // Convert packed frame buffer values from u8 (0-255) to f32 (0.0f-1.0f)
+            __m128 fb_pixel_a4 = _mm_mul_ps(_mm_cvtepi32_ps(fb_pixel_a4i), inv_255);
+            __m128 fb_pixel_b4 = _mm_mul_ps(_mm_cvtepi32_ps(fb_pixel_b4i), inv_255);
+            __m128 fb_pixel_g4 = _mm_mul_ps(_mm_cvtepi32_ps(fb_pixel_g4i), inv_255);
+            __m128 fb_pixel_r4 = _mm_mul_ps(_mm_cvtepi32_ps(fb_pixel_r4i), inv_255);
+
+            __m128 inv_alpha4 = _mm_sub_ps(one4, blended_a4);
+            fb_pixel_r4 = _mm_add_ps(_mm_mul_ps(fb_pixel_r4, inv_alpha4), _mm_mul_ps(blended_r4, blended_a4));
+            fb_pixel_g4 = _mm_add_ps(_mm_mul_ps(fb_pixel_g4, inv_alpha4), _mm_mul_ps(blended_g4, blended_a4));
+            fb_pixel_b4 = _mm_add_ps(_mm_mul_ps(fb_pixel_b4, inv_alpha4), _mm_mul_ps(blended_b4, blended_a4));
+            fb_pixel_a4 = _mm_add_ps(_mm_mul_ps(fb_pixel_a4, inv_alpha4), _mm_mul_ps(blended_a4, blended_a4));
+
+            fb_pixel_a4i = _mm_cvtps_epi32(_mm_mul_ps(fb_pixel_a4, two_fifty_five4));
+            fb_pixel_b4i = _mm_cvtps_epi32(_mm_mul_ps(fb_pixel_b4, two_fifty_five4));
+            fb_pixel_g4i = _mm_cvtps_epi32(_mm_mul_ps(fb_pixel_g4, two_fifty_five4));
+            fb_pixel_r4i = _mm_cvtps_epi32(_mm_mul_ps(fb_pixel_r4, two_fifty_five4));
+
+            // Repack fb_pixels from rrrr, gggg, bbbb, aaaa to rbga, rgba, rgba, rgba
+            __m128i temp_ag_lo = _mm_unpacklo_epi32(fb_pixel_a4i, fb_pixel_g4i);
+            __m128i temp_ag_hi = _mm_unpackhi_epi32(fb_pixel_a4i, fb_pixel_g4i);
+            __m128i temp_br_lo = _mm_unpacklo_epi32(fb_pixel_b4i, fb_pixel_r4i);
+            __m128i temp_br_hi = _mm_unpackhi_epi32(fb_pixel_b4i, fb_pixel_r4i);
+
+            __m128i fb_pixel_0 = _mm_unpacklo_epi32(temp_ag_lo, temp_br_lo);
+            __m128i fb_pixel_1 = _mm_unpackhi_epi32(temp_ag_lo, temp_br_lo);
+            __m128i fb_pixel_2 = _mm_unpacklo_epi32(temp_ag_hi, temp_br_hi);
+            __m128i fb_pixel_3 = _mm_unpackhi_epi32(temp_ag_hi, temp_br_hi);
+
+            // Squash the RGBA values down to 32 bits in each SSE "slot"
+            // eg. 000a 000b 000g 000r -> abgr abgr abgr abgr
+            fb_pixel_0 = _mm_packs_epi32(fb_pixel_0, fb_pixel_0);
+            fb_pixel_0 = _mm_packus_epi16(fb_pixel_0, fb_pixel_0);
+            fb_pixel_1 = _mm_packs_epi32(fb_pixel_1, fb_pixel_1);
+            fb_pixel_1 = _mm_packus_epi16(fb_pixel_1, fb_pixel_1);
+            fb_pixel_2 = _mm_packs_epi32(fb_pixel_2, fb_pixel_2);
+            fb_pixel_2 = _mm_packus_epi16(fb_pixel_2, fb_pixel_2);
+            fb_pixel_3 = _mm_packs_epi32(fb_pixel_3, fb_pixel_3);
+            fb_pixel_3 = _mm_packus_epi16(fb_pixel_3, fb_pixel_3);
+
+            // Convert pixels from ABGR ABGR ABGR to ABGR 0000 0000 0000 etc to make them easy to OR together.
+            fb_pixel_0 = _mm_and_si128(fb_pixel_0, first_mask);
+            fb_pixel_1 = _mm_and_si128(fb_pixel_1, second_mask);
+            fb_pixel_2 = _mm_and_si128(fb_pixel_2, third_mask);
+            fb_pixel_3 = _mm_and_si128(fb_pixel_3, fourth_mask);
+
+            __m128i out = _mm_or_si128(_mm_or_si128(fb_pixel_0, fb_pixel_1), 
+                                       _mm_or_si128(fb_pixel_2, fb_pixel_3));
+
+            __m128i masked_out = _mm_or_si128(_mm_and_si128(write_mask, out),
+                                              _mm_andnot_si128(write_mask, fb_pixel4));
+
+            _mm_storeu_si128(fb_pixel, masked_out);
         }
     }
+    END_COUNTER_N(process_pixel, (y_max - y_min + 1) * (x_max - x_min + 1));
     END_COUNTER(render_rotated_block);
 }
 
-static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer)
+static void render_rotated_block(render_cmd_block_t *cmd, 
+                                 camera_t *cam, 
+                                 game_frame_buffer_t *frame_buffer)
 {
     START_COUNTER(render_rotated_block);
     basis_t basis = cmd->header.basis;
@@ -428,115 +563,115 @@ static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_fr
     v4 tint = cmd->tint;
 
     u32 *fb_data = frame_buffer->data;
+    START_COUNTER(process_pixel);
     for (i32 y = y_min; y <= y_max; y++) {
-        for (i32 x = x_min; x <= x_max; x++) {
-            START_COUNTER(test_pixel);
-            // NOTE(Wes): Take the dot product of the point and the axis
-            // perpendicular to the one we are testing to see which side
-            // the point lies on. This code moves the point p in an
-            // anti-clockwise direction.
-            v2 p_orig = v2_sub(V2(x, y), origin);
-            f32 u = v2_dot(p_orig, n_x_axis);
-            f32 v = v2_dot(p_orig, n_y_axis);
-            if (u >= 0.0f &&
-                u <= 1.0f &&
-                v >= 0.0f &&
-                v <= 1.0f) {
-                START_COUNTER(fill_pixel);
-                // TODO(Wes): Actually clamp the texels for subpixel rendering
-                // rather than just shortening the texture.
-                f32 texel_x = 1.0f + (u * (f32)(texture->w - 3)) + 0.5f;
-                f32 texel_y = 1.0f + (v * (f32)(texture->h - 3)) + 0.5f;
+        for (i32 x = x_min; x <= x_max; x+=4) {
+            for (i32 i = 0; i < 4; ++i) {
+                // NOTE(Wes): Take the dot product of the point and the axis
+                // perpendicular to the one we are testing to see which side
+                // the point lies on. This code moves the point p in an
+                // anti-clockwise direction.
+                v2 p_orig = v2_sub(V2(x + i, y), origin);
+                f32 u = v2_dot(p_orig, n_x_axis);
+                f32 v = v2_dot(p_orig, n_y_axis);
+                if (u >= 0.0f &&
+                    u <= 1.0f &&
+                    v >= 0.0f &&
+                    v <= 1.0f) {
+                    // TODO(Wes): Actually clamp the texels for subpixel rendering
+                    // rather than just shortening the texture.
+                    f32 texel_x = u * (texture->w - 2.0f);
+                    f32 texel_y = v * (texture->h - 2.0f);
 
-                u32 texture_x = (u32)texel_x;
-                u32 texture_y = (u32)texel_y;
+                    u32 texture_x = (u32)texel_x;
+                    u32 texture_y = (u32)texel_y;
 
-                // NOTE(Wes): Get the rounded off value of the texel.
-                f32 fraction_x = texel_x - texture_x;
-                f32 fraction_y = texel_y - texture_y;
+                    // NOTE(Wes): Get the rounded off value of the texel.
+                    f32 fraction_x = texel_x - texture_x;
+                    f32 fraction_y = texel_y - texture_y;
 
-                texture_x = kclamp(texture_x, 0, texture->w - 1);
-                texture_y = kclamp(texture_y, 0, texture->h - 1);
+                    texture_x = kclamp(texture_x, 0, texture->w - 1);
+                    texture_y = kclamp(texture_y, 0, texture->h - 1);
 
-                u32 *texel = &texture->data[texture_y * texture->w + texture_x];
+                    u32 *texel = &texture->data[texture_y * texture->w + texture_x];
 
-                // NOTE(Wes): Blend the closest 4 texels for better looking
-                // pixels. Bilinear blending.
-                v4 texel_a = read_image_color(*texel);
-                v4 texel_b = read_image_color(*(texel + 1));
-                v4 texel_c = read_image_color(*(texel + texture->w));
-                v4 texel_d = read_image_color(*(texel + texture->w + 1));
+                    // NOTE(Wes): Blend the closest 4 texels for better looking
+                    // pixels. Bilinear blending.
+                    v4 texel_a = read_image_color(*texel);
+                    v4 texel_b = read_image_color(*(texel + 1));
+                    v4 texel_c = read_image_color(*(texel + texture->w));
+                    v4 texel_d = read_image_color(*(texel + texture->w + 1));
 
-                // NOTE(Wes): Perform gamma correction on pixels
-                // before blending them to ensure all math is done
-                // in linear space.
-                texel_a = srgb_to_linear(texel_a);
-                texel_b = srgb_to_linear(texel_b);
-                texel_c = srgb_to_linear(texel_c);
-                texel_d = srgb_to_linear(texel_d);
+                    // NOTE(Wes): Perform gamma correction on pixels
+                    // before blending them to ensure all math is done
+                    // in linear space.
+                    texel_a = srgb_to_linear(texel_a);
+                    texel_b = srgb_to_linear(texel_b);
+                    texel_c = srgb_to_linear(texel_c);
+                    texel_d = srgb_to_linear(texel_d);
 
-                v4 blended_color =
-                    v4_lerp(v4_lerp(texel_a, texel_b, fraction_x), v4_lerp(texel_c, texel_d, fraction_x), fraction_y);
-                if (blended_color.a == 0.0f)
-                {
-                    continue;
-                }
+                    v4 blended_color =
+                        v4_lerp(v4_lerp(texel_a, texel_b, fraction_x), v4_lerp(texel_c, texel_d, fraction_x), fraction_y);
+                    if (blended_color.a == 0.0f)
+                    {
+                        continue;
+                    }
 
-                v3 light_intensity = V3(1.0f, 1.0f, 1.0f);
+                    v3 light_intensity = V3(1.0f, 1.0f, 1.0f);
 
 #if 0
-                // NOTE(Wes): If no normals are supplied then we use a default
-                //            normal that points straigh out the screen.
-                // TODO(Wes): Create light volumes out of convex shapes.
-                //            We can then use SAT collision detection to determine
-                //            which entities the light is affecting.
-                v3 normal = V3(0.5f, 0.5f, 1.0f);
-                if (normals) {
-                    u32 *normal255 = &normals->data[texture_y * texture->w + texture_x];
-                    normal = read_image_color(*normal255).rgb;
-                }
+                    // NOTE(Wes): If no normals are supplied then we use a default
+                    //            normal that points straigh out the screen.
+                    // TODO(Wes): Create light volumes out of convex shapes.
+                    //            We can then use SAT collision detection to determine
+                    //            which entities the light is affecting.
+                    v3 normal = V3(0.5f, 0.5f, 1.0f);
+                    if (normals) {
+                        u32 *normal255 = &normals->data[texture_y * texture->w + texture_x];
+                        normal = read_image_color(*normal255).rgb;
+                    }
 
-                // Convert the normal from the range 0,1 to -1,1
-                normal = v3_sub(v3_mul(normal, 2.0f), V3(1.0f, 1.0f, 1.0f));
-                normal = v3_normalize(normal);
-                u32 num_lights = cmd->num_lights;
-                v3 light_intensity = V3(0.0f, 0.0f, 0.0f);
-                for (u32 i = 0; i < num_lights; ++i) {
-                    light_t *light = &cmd->lights[i];
+                    // Convert the normal from the range 0,1 to -1,1
+                    normal = v3_sub(v3_mul(normal, 2.0f), V3(1.0f, 1.0f, 1.0f));
+                    normal = v3_normalize(normal);
+                    u32 num_lights = cmd->num_lights;
+                    v3 light_intensity = V3(0.0f, 0.0f, 0.0f);
+                    for (u32 i = 0; i < num_lights; ++i) {
+                        light_t *light = &cmd->lights[i];
 
-                    v3 light_pos = v3_mul(light->position, cam->units_to_pixels);
-                    v3 light_dir = v3_sub(light_pos, V3(x, y, 0.0f)); // TODO(Wes): Objects in the world need a Z depth.
-                    f32 light_distance = v3_len(light_dir);
-                    light_dir = v3_normalize(light_dir);
+                        v3 light_pos = v3_mul(light->position, cam->units_to_pixels);
+                        v3 light_dir = v3_sub(light_pos, V3(x, y, 0.0f)); // TODO(Wes): Objects in the world need a Z depth.
+                        f32 light_distance = v3_len(light_dir);
+                        light_dir = v3_normalize(light_dir);
 
-                    f32 light_factor = v3_dot(normal, light_dir);
-                    v3 ambient_color = v3_mul(light->ambient.rgb, light->ambient.a);
-                    v3 light_color = v3_mul(light->color.rgb, light->color.a);
-                    v3 diffuse = v3_mul(light_color, kmax(light_factor, 0.0f));
+                        f32 light_factor = v3_dot(normal, light_dir);
+                        v3 ambient_color = v3_mul(light->ambient.rgb, light->ambient.a);
+                        v3 light_color = v3_mul(light->color.rgb, light->color.a);
+                        v3 diffuse = v3_mul(light_color, kmax(light_factor, 0.0f));
 
-                    f32 attenuation =
-                        kclampf(1.0f - (ksq(light_distance) / ksq(light->radius * cam->units_to_pixels)), 0.0f, 1.0f);
-                    attenuation *= attenuation;
+                        f32 attenuation =
+                            kclampf(1.0f - (ksq(light_distance) / ksq(light->radius * cam->units_to_pixels)), 0.0f, 1.0f);
+                        attenuation *= attenuation;
 
-                    v3 intensity = v3_mul(v3_clamp(v3_add(diffuse, ambient_color), 0.0f, 1.0f), attenuation);
-                    light_intensity = v3_add(light_intensity, intensity);
-                }
+                        v3 intensity = v3_mul(v3_clamp(v3_add(diffuse, ambient_color), 0.0f, 1.0f), attenuation);
+                        light_intensity = v3_add(light_intensity, intensity);
+                    }
 #endif
 
-                u32 *fb_pixel = &fb_data[x + y * frame_buffer->w];
-                v4 dest_color = read_frame_buffer_color(*fb_pixel);
+                    u32 *fb_pixel = &fb_data[x + i + y * frame_buffer->w];
+                    v4 dest_color = read_frame_buffer_color(*fb_pixel);
 
-                dest_color = srgb_to_linear(dest_color);
-                dest_color = linear_blend_tint(blended_color, tint, dest_color);
-                dest_color = linear_to_srgb(dest_color);
-                dest_color.rgb = v3_hadamard(dest_color.rgb, light_intensity);
+                    dest_color = srgb_to_linear(dest_color);
+                    dest_color = linear_blend_tint(blended_color, tint, dest_color);
+                    dest_color = linear_to_srgb(dest_color);
+                    dest_color.rgb = v3_hadamard(dest_color.rgb, light_intensity);
 
-                *fb_pixel = color_frame_buffer_u32(dest_color);
-                END_COUNTER(fill_pixel);
+                    *fb_pixel = color_frame_buffer_u32(dest_color);
+                }
             }
-            END_COUNTER(test_pixel);
         }
     }
+    END_COUNTER_N(process_pixel, (y_max - y_min + 1) * (x_max - x_min + 1));
     END_COUNTER(render_rotated_block);
 }
 
@@ -708,9 +843,11 @@ void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer)
             address += sizeof(render_cmd_block_t);
         } break;
         case render_type_rotated_block:
-            //render_rotated_block((render_cmd_block_t *)header, queue->camera, frame_buffer);
-            render_image((render_cmd_block_t *)header, queue->camera, frame_buffer);
-            address += sizeof(render_cmd_block_t);
+            {
+                //render_rotated_block((render_cmd_block_t *)header, queue->camera, frame_buffer);
+                render_image((render_cmd_block_t *)header, queue->camera, frame_buffer);
+                address += sizeof(render_cmd_block_t);
+            }
             break;
         case render_type_line:
             render_line((render_cmd_line_t *)header, queue->camera, frame_buffer);
