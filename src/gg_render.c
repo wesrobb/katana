@@ -203,9 +203,6 @@ static void render_block(v2 pos, v2 size, v4 color, camera_t *cam, game_frame_bu
 #define m128_access(a, i) ((f32*)&a)[i]
 #define m128_access8(a, i) ((u8*)&a)[i]
 
-// TODO(Wes): Remove this!
-#include <stdio.h>
-
 static void render_image(render_cmd_block_t *cmd, 
                          camera_t *cam, 
                          game_frame_buffer_t *frame_buffer)
@@ -321,6 +318,14 @@ static void render_image(render_cmd_block_t *cmd,
                                  _mm_and_ps(_mm_and_ps(u4_ge_zero, u4_le_one), 
                                             _mm_and_ps(v4_ge_zero, v4_le_one)));
 
+            // NOTE(Wes): Not a fan of this scalar branch but who can argue with ~50% performance boost.
+            if (m128i_access(write_mask, 0) == 0 &&
+                m128i_access(write_mask, 1) == 0 &&
+                m128i_access(write_mask, 2) == 0 && 
+                m128i_access(write_mask, 3) == 0) {
+                continue;
+            }
+
             // Clamp texture coord
             u4 = _mm_max_ps(_mm_min_ps(u4, one4), zero4);
             v4 = _mm_max_ps(_mm_min_ps(v4, one4), zero4);
@@ -391,7 +396,7 @@ static void render_image(render_cmd_block_t *cmd,
             __m128i texel_d_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_d, 16));
             __m128i texel_d_a4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_d, 24));
 
-            // Convert packed texels from i8 in range 0-255 to f32 in range 0-1.
+            // Convert packed texels from u8 in range 0-255 to f32 in range 0-1.
             __m128 texel_a_r4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_a_r4i), inv_255);
             __m128 texel_a_g4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_a_g4i), inv_255);
             __m128 texel_a_b4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_a_b4i), inv_255);

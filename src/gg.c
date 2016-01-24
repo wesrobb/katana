@@ -549,7 +549,7 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
     }
 #endif
     // NOTE(Wes): Start by clearing the screen.
-    render_push_clear(game_state->render_queue, COLOR(1.0f, 1.0f, 1.0f, 1.0f));
+    //render_push_clear(game_state->render_queue, COLOR(1.0f, 1.0f, 1.0f, 1.0f));
     game_state->elapsed_time += input->delta_time;
     f32 angle = game_state->elapsed_time * 0.5f;
     v2 light_origin = v2_mul(V2(kcosf(angle), ksinf(angle)), 10);
@@ -580,7 +580,7 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
                 basis_t tile_basis = {tile_origin, V2(tilemap->tile_size.x, 0.0f), V2(0.0f, tilemap->tile_size.y)};
                 render_push_rotated_block(game_state->render_queue,
                                           &tile_basis,
-                                          V4(1.0f, 1.0f, 1.0f, 1.0f),
+                                          V4(1.0f, 1.0f, 1.0f, 0.1f),
                                           &game_state->tile_image,
                                           0,
                                           &light,

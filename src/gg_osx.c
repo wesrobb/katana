@@ -308,18 +308,22 @@ static void osx_unload_file(loaded_file_t *loaded_file)
     munmap(loaded_file->contents, loaded_file->size);
 }
 
-static void osx_handle_debug_counters(game_memory_t *memory)
+static void osx_handle_debug_counters(game_memory_t *memory, b8 must_print)
 {
 #ifdef GG_INTERNAL
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "DEBUG COUNTERS");
+    if (must_print) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "DEBUG COUNTERS");
+    }
     for (u32 i = 0; i < ARRAY_LEN(memory->counters); ++i) {
         dbg_counter_t *counter = &memory->counters[i];
-        if (counter->hits)
-        {
+        if (must_print) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tcy %"PRIu64", h %u, cy/h %"PRIu64, 
                         counter->cycles, 
                         counter->hits,
                         counter->cycles / counter->hits);
+        }
+        if (counter->hits)
+        {
             counter->cycles = 0;
             counter->hits = 0;
         }
@@ -333,8 +337,8 @@ int main(void)
         // TODO(Wes): SDL_Init didn't work!
     }
 
-    i32 window_width = 1280;
-    i32 window_height = 720;
+    i32 window_width = 960;
+    i32 window_height = 540;
     i32 windoy_pos_x = 10;
     i32 windoy_pos_y = 400;
 
@@ -426,6 +430,7 @@ int main(void)
     u64 perf_freq = SDL_GetPerformanceFrequency();
     i32 frame_counter = 0;
     f32 frame_sec = 1.0f / GG_TARGET_FPS;
+    f32 frame_accumulator = 0.0f;
     SDL_Event event;
     b8 recording = false;
     b8 playing_back = false;
@@ -507,7 +512,6 @@ int main(void)
         frame_buffer.pitch /= sizeof(u32);
 
         game.update_and_render_fn(&game_memory, &frame_buffer, &audio, new_input, &output, &callbacks);
-        osx_handle_debug_counters(&game_memory);
         SDL_UnlockTexture(texture);
 
         SDL_RenderCopy(renderer, texture, 0, 0);
@@ -535,13 +539,20 @@ int main(void)
 
         u64 current_time = SDL_GetPerformanceCounter();
         frame_sec = (current_time - last_time) / (f32)perf_freq;
+        frame_accumulator += frame_sec;
         last_time = current_time;
-        if (frame_counter++ % 180 == 0) {
+        b8 must_print = false;
+        if (frame_counter++ % 120 == 0) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "-------------------");
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Frame time %.02f ms", frame_sec * 1000);
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "FPS %.01f", 120 / frame_accumulator);
+            frame_accumulator = 0.0f;
             // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Queued
             // audio bytes %d",
             // queued_audio_size);
+            must_print = true;
         }
+        osx_handle_debug_counters(&game_memory, must_print);
     }
 
     SDL_Quit();

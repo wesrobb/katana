@@ -11,8 +11,9 @@ GAME_SRC = src/gg_unitybuild.c
 C_FILES = $(wildcard src/*.c)
 H_FILES = $(wildcard src/*.h)
 
-SDL_HEADERS = /usr/local/include/SDL2
 USR_LIB_DIR = /usr/local/lib
+USR_HEADER_DIR = /usr/local/include
+SDL_HEADERS = /usr/local/include/SDL2
 SDL_LIB = SDL2
 
 BUILD_DIR = build
@@ -28,7 +29,7 @@ $(BIN_TARGET):
 	$(CC) $(BIN_SRC) -o $(BUILD_DIR)/$(BIN_TARGET) $(CFLAGS) -I$(SDL_HEADERS) -L$(USR_LIB_DIR) -l$(SDL_LIB) $(DEFINES) $(DISABLED_WARNINGS)
 
 $(GAME_TARGET):
-	$(CC) $(GAME_SRC) -shared -o $(BUILD_DIR)/$(GAME_TARGET) $(CFLAGS) $(DEFINES) $(DISABLED_WARNINGS)
+	$(CC) $(GAME_SRC) -shared -o $(BUILD_DIR)/$(GAME_TARGET) $(CFLAGS) -I$(USR_HEADER_DIR)  $(DEFINES) $(DISABLED_WARNINGS)
 
 tags: $(C_FILES) $(H_FILES)
 	/usr/local/bin/ctags -R --exclude=.git --exclude=build --extra=+f --languages=c --tag-relative
