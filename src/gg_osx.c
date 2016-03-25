@@ -41,9 +41,9 @@ typedef struct {
     game_update_and_render_fn_t update_and_render_fn;
 } osx_game_t;
 
-#define GG_MAX_RECORDED_INPUT_EVENTS 6000 // 100 seconds of input at 60fps
+#define GG_MAX_RECORDED_INPUT_EVENTS 1200 // 20 seconds of input at 60fps
 typedef struct {
-    game_input_t *input_events;
+    game_input_t input_events[GG_MAX_RECORDED_INPUT_EVENTS];
     u32 input_record_index;
     u32 input_playback_index;
     game_memory_t memory;
@@ -70,11 +70,11 @@ static osx_game_so_paths_t osx_get_game_so_paths()
 
     static char so_path[1024] = {0};
     strncpy(so_path, real_exe_path, last_slash + 1);
-    strcat(so_path, "gg.so");
+    strcat(so_path, STR(GAME_DLL));
 
     static char temp_so_path[1024] = {0};
     strncpy(temp_so_path, real_exe_path, last_slash + 1);
-    strcat(temp_so_path, "gg_temp.so");
+    strcat(temp_so_path, STR(GAME_TEMP_DLL));
 
     osx_game_so_paths_t game_so_paths;
     game_so_paths.so = so_path;
@@ -256,7 +256,7 @@ static void osx_handle_keydown(SDL_Keycode key, game_controller_input_t *old_inp
 
 static game_memory_t osx_allocate_game_memory(void *base_address)
 {
-    game_memory_t memory = {};
+    game_memory_t memory = {0};
     memory.transient_store_size = Megabytes(512);
     memory.transient_store =
         mmap(base_address, memory.transient_store_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
@@ -279,7 +279,7 @@ static void osx_copy_game_memory(game_memory_t *dst, game_memory_t *src)
 
 static loaded_file_t osx_load_file(const char *path)
 {
-    loaded_file_t result = {};
+    loaded_file_t result = {0};
     int fd = open(path, O_RDONLY);
     if (fd == -1) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to open file %s", path);
@@ -342,8 +342,8 @@ int main(void)
     i32 windoy_pos_x = 10;
     i32 windoy_pos_y = 400;
 
-    SDL_Window *window = SDL_CreateWindow(
-        "Handmade Hero", windoy_pos_x, windoy_pos_y, window_width, window_height, SDL_WINDOW_RESIZABLE);
+    SDL_Window *window = SDL_CreateWindow("gg", windoy_pos_x, windoy_pos_y,
+                                          window_width, window_height, SDL_WINDOW_RESIZABLE);
 
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     u32 frame_buffer_width = 1280;
@@ -351,7 +351,7 @@ int main(void)
     SDL_Texture *texture = SDL_CreateTexture(
         renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, frame_buffer_width, frame_buffer_height);
 
-    SDL_AudioSpec audio_spec_want = {};
+    SDL_AudioSpec audio_spec_want = {0};
     audio_spec_want.freq = 48000;
     audio_spec_want.format = AUDIO_S16LSB;
     audio_spec_want.channels = 2;
@@ -369,13 +369,13 @@ int main(void)
     game_memory_t game_memory = osx_allocate_game_memory((void *)Terabytes(2));
 
     osx_game_so_paths_t game_so_paths = osx_get_game_so_paths();
-    osx_game_t game = {};
+    osx_game_t game = {0};
 
-    game_frame_buffer_t frame_buffer = {};
+    game_frame_buffer_t frame_buffer = {0};
     frame_buffer.w = frame_buffer_width;
     frame_buffer.h = frame_buffer_height;
 
-    game_input_t input[2] = {};
+    game_input_t input[2] = {0};
     game_input_t *new_input = &input[0];
     game_input_t *old_input = &input[1];
 
@@ -397,32 +397,31 @@ int main(void)
         SDL_Haptic *haptic_handle = SDL_HapticOpenFromJoystick(joystick_handle);
         if (haptic_handle) {
             haptic_handles[controller_index] = haptic_handle;
+            if (SDL_HapticRumbleInit(haptic_handle) != 0) {
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Failed to initialize rumble %s", SDL_GetError());
+                // Failed to init rumble so just turn it off.
+                SDL_HapticClose(haptic_handles[controller_index]);
+                haptic_handles[controller_index] = 0;
+            }
         } else {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Failed to initialize haptics %s", SDL_GetError());
         }
         osx_init_controller(new_input, controller_index);
         controller_index++;
 
-        if (SDL_HapticRumbleInit(haptic_handles[controller_index]) != 0) {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Failed to initialize rumble %s", SDL_GetError());
-            // Failed to init rumble so just turn it off.
-            SDL_HapticClose(haptic_handles[controller_index]);
-            haptic_handles[controller_index] = 0;
-        }
     }
 
-    game_output_t output = {};
+    game_output_t output = {0};
 
     game_audio_t audio;
     audio.samples_per_second = audio_spec_want.freq;
     audio.sample_count = audio_spec_want.samples;
 
-    osx_game_record_t game_record = {};
-    game_record.input_events = mmap(
-        0, sizeof(game_input_t) * GG_MAX_RECORDED_INPUT_EVENTS, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
-    game_record.memory = osx_allocate_game_memory((void *)Terabytes(4));
+    osx_game_record_t game_record = {0};
+    void *game_record_base_address = (void *)Terabytes(4);
+    game_record.memory = osx_allocate_game_memory(game_record_base_address);
 
-    game_callbacks_t callbacks = {};
+    game_callbacks_t callbacks = {0};
     callbacks.load_file = &osx_load_file;
     callbacks.unload_file = &osx_unload_file;
 
@@ -451,7 +450,11 @@ int main(void)
                 break;
             case SDL_KEYDOWN:
                 if (event.key.keysym.sym == SDLK_r) {
-                    if (recording) {
+                    if (playing_back) {
+                        SDL_LogInfo(
+                            SDL_LOG_CATEGORY_APPLICATION, "Cannot record while performing playback!");
+                    }
+                    else if (recording) {
                         SDL_LogInfo(
                             SDL_LOG_CATEGORY_APPLICATION, "Recorded %d input events", game_record.input_record_index);
                         recording = 0;
@@ -463,7 +466,11 @@ int main(void)
                 }
                 if (event.key.keysym.sym == SDLK_p) {
                     game_record.input_playback_index = 0;
-                    if (playing_back) {
+                    if (recording) {
+                        SDL_LogInfo(
+                            SDL_LOG_CATEGORY_APPLICATION, "Cannot perform playback while recording!");
+                    }
+                    else if (playing_back) {
                         playing_back = 0;
                     } else {
                         playing_back = 1;
@@ -485,7 +492,7 @@ int main(void)
         // TODO(Wes): Debug builds only.
         time_t last_modified = osx_get_last_modified(game_so_paths.so);
         if (difftime(last_modified, game.so_last_modified) != 0) {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "gg.so modified - Reloading");
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, STR(GAME_DLL) " modified - Reloading");
             dlclose(game.so);
             copyfile(game_so_paths.so, game_so_paths.temp_so, 0, COPYFILE_ALL);
             osx_load_game(&game, game_so_paths.temp_so);
@@ -505,8 +512,7 @@ int main(void)
             *new_input = game_record.input_events[playback_index];
         }
 
-        // NOTE(Wes): The frame buffer pixels point directly to the SDL
-        // texture.
+        // NOTE(Wes): The frame buffer pixels point directly to the SDL texture.
         SDL_LockTexture(texture, 0, (void **)&frame_buffer.data, (i32 *)&frame_buffer.pitch);
         // NOTE(Wes): Set the pitch to num pixels.
         frame_buffer.pitch /= sizeof(u32);

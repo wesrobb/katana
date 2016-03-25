@@ -48,14 +48,6 @@ typedef struct {
 } tilemap_t;
 
 // Note(Wes): Entities
-typedef struct {
-    u32 max_frames;
-    u32 current_frame;
-    u32 fps;
-    f32 accumulator;
-    image_t *frames;
-} entity_anim_t;
-
 typedef enum {
     entity_type_player,
 } entity_type_t;
@@ -63,7 +55,6 @@ typedef enum {
 #define GG_MAX_HIT_ENTITIES 4
 typedef struct {
     u32 hit_entities[GG_MAX_HIT_ENTITIES];
-    entity_anim_t walk;
 } entity_player_t;
 
 typedef struct {
@@ -74,10 +65,8 @@ typedef struct {
 
     f32 velocity_factor;
     f32 acceleration_factor;
-
     f32 rotation;
 
-    b8 on_ground;
     b8 exists;
 
     entity_type_t type;
@@ -118,11 +107,6 @@ typedef struct {
 #define GG_MAX_ENTITIES 512
 typedef struct {
     entity_t entities[GG_MAX_ENTITIES];           // Entity 0 is the "null" entity
-    v2 camera_tracked_positions[GG_MAX_ENTITIES]; // Camera will
-                                                  // always ensure
-                                                  // these
-                                                  // positions are
-                                                  // in view.
     u32 controlled_entities[GG_MAX_CONTROLLERS];
     tilemap_t tilemap;
     camera_t camera;
