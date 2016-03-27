@@ -347,7 +347,8 @@ static loaded_file_t win_load_file(const char *path)
 		return file;
 	}
 
-	i32 nb_read_total = 0, nb_read = 1;
+	size_t nb_read_total = 0;
+	size_t nb_read = 1;
 	char* buf = file.contents;
 	while (nb_read_total < file.size && nb_read != 0) {
 		nb_read = SDL_RWread(sdl_rwops, buf, 1, ((size_t)file.size - nb_read_total));
@@ -364,6 +365,29 @@ static void win_unload_file(loaded_file_t *loaded_file)
 {
     assert(loaded_file);
 	VirtualFree(loaded_file->contents, 0, MEM_RELEASE);
+}
+
+static void win_handle_debug_counters(game_memory_t *memory, b8 must_print)
+{
+#ifdef GG_INTERNAL
+    if (must_print) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "DEBUG COUNTERS");
+    }
+    for (u32 i = 0; i < ARRAY_LEN(memory->counters); ++i) {
+        dbg_counter_t *counter = &memory->counters[i];
+        if (must_print) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tcy %I64u, h %u, cy/h %I64u", 
+                        counter->cycles, 
+                        counter->hits,
+                        counter->cycles / counter->hits);
+        }
+        if (counter->hits)
+        {
+            counter->cycles = 0;
+            counter->hits = 0;
+        }
+    }
+#endif
 }
 
 int main(int argc, char *argv[])
@@ -481,6 +505,7 @@ int main(int argc, char *argv[])
     u64 perf_freq = SDL_GetPerformanceFrequency();
     i32 frame_counter = 0;
     f32 frame_sec = 1.0f / GG_TARGET_FPS;
+	f32 frame_accumulator = 0.0f;
     SDL_Event event;
     b8 recording = false;
     b8 playing_back = false;
@@ -603,17 +628,22 @@ int main(int argc, char *argv[])
         new_input = old_input;
         old_input = temp;
 
-        u64 current_time = SDL_GetPerformanceCounter();
+		u64 current_time = SDL_GetPerformanceCounter();
         frame_sec = (current_time - last_time) / (f32)perf_freq;
+        frame_accumulator += frame_sec;
         last_time = current_time;
-        if (frame_counter++ % 180 == 0) {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "Frame time %.02f ms",
-                        frame_sec * 1000);
+        b8 must_print = false;
+        if (frame_counter++ % 120 == 0) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "-------------------");
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Frame time %.02f ms", frame_sec * 1000);
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "FPS %.01f", 120 / frame_accumulator);
+            frame_accumulator = 0.0f;
             // SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Queued
             // audio bytes %d",
             // queued_audio_size);
+            must_print = true;
         }
+        win_handle_debug_counters(&game_memory, must_print);
     }
 
     SDL_Quit();

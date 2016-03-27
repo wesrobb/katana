@@ -50,6 +50,10 @@ static __inline__ unsigned long long rdtsc(void)
     __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
     return ( (unsigned long long)lo)|( ((unsigned long long)hi)<<32 );
 }
+#elif defined(_MSC_VER)
+#include <intrin.h>
+#pragma intrinsic(__rdtsc)
+#define rdtsc __rdtsc
 #endif
 
 typedef unsigned char b8;
@@ -86,8 +90,9 @@ typedef struct {
 
 #else
 
-#define START_COUNTER(ID)
-#define END_COUNTER(ID)
+#define START_COUNTER(id)
+#define END_COUNTER(id)
+#define END_COUNTER_N(id, count)
 
 #endif
 
@@ -183,7 +188,7 @@ typedef struct {
 
 typedef struct {
     void *contents;
-    i64 size;
+    u64 size;
     b8 success;
 } loaded_file_t;
 

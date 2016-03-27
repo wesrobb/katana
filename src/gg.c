@@ -61,9 +61,9 @@ static ray_cast_result ray_cast_vertical(v2 origin, f32 end_y, tilemap_t *tilema
     ray_cast_result result;
     f32 tile_width = tilemap->tile_size.x;
     f32 tile_height = tilemap->tile_size.y;
-    i32 tilemap_start_y = origin.y / tile_height;
-    i32 tilemap_x = origin.x / tile_width;
-    i32 tilemap_end_y = end_y / tile_height;
+    i32 tilemap_start_y = (i32)origin.y / (i32)tile_height;
+    i32 tilemap_x = (i32)origin.x / (i32)tile_width;
+    i32 tilemap_end_y = (i32)end_y / (i32)tile_height;
 
     for (i32 i = tilemap_start_y; i <= tilemap_end_y; ++i) {
         if (*get_tile(tilemap, tilemap_x, i)) {
@@ -91,9 +91,9 @@ static ray_cast_result ray_cast_horizontal(v2 origin, f32 end_x, tilemap_t *tile
     ray_cast_result result;
     f32 tile_width = tilemap->tile_size.x;
     f32 tile_height = tilemap->tile_size.y;
-    i32 tilemap_start_x = origin.x / tile_width;
-    i32 tilemap_y = origin.y / tile_height;
-    i32 tilemap_end_x = end_x / tile_width;
+    i32 tilemap_start_x = (i32)origin.x / (i32)tile_width;
+    i32 tilemap_y = (i32)origin.y / (i32)tile_height;
+    i32 tilemap_end_x = (i32)end_x / (i32)tile_width;
 
     for (i32 i = tilemap_start_x; i <= tilemap_end_x; ++i) {
         unsigned char *tile = get_tile(tilemap, i, tilemap_y);
@@ -220,8 +220,6 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         f32 collision_buffer = 0.001f;
         v2 new_accel = new_accels[i];
 
-        v2 half_entity_size = v2_div(entity->size, 2.0f);
-
         // Gravity
         // new_accel = v2_add(new_accel, world->gravity);
 
@@ -316,7 +314,7 @@ static image_t load_image(const char *path, load_file_fn load_file)
     int unused = 0;
     int required_components = 4; // We always want RGBA.
     result.data = (u32 *)stbi_load_from_memory(
-        loaded_file.contents, loaded_file.size, (int *)&result.w, (int *)&result.h, &unused, required_components);
+        loaded_file.contents, (int)loaded_file.size, (int *)&result.w, (int *)&result.h, &unused, required_components);
 
     // NOTE(Wes): Pre-multiply alpha.
     for (u32 y = 0; y < result.h; y++) {

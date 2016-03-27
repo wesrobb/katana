@@ -7,3 +7,19 @@ cscope.out
 
 *.swp
 *.pyc
+*.VC.opendb
+*.sdf
+*.vs
+*.exe
+*.dll
+*.obj
+*.tlog
+*.user
+*.log
+*.idb
+*.pdb
+*.ilk
+*.lib
+*.exp
+*.ipdb
+*.iobj

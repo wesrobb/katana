@@ -6,12 +6,12 @@
 
 // Note(Wes): Memory
 typedef struct {
-    u32 size;
+    u64 size;
     u32 index;
     u8 *base;
 } memory_arena_t;
 
-static inline void init_arena(memory_arena_t *arena, u32 size, u8 *base)
+static inline void init_arena(memory_arena_t *arena, u64 size, u8 *base)
 {
     arena->size = size;
     arena->base = base;
