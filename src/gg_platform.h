@@ -32,6 +32,9 @@
 
 #define ARRAY_LEN(array) (sizeof((array))/sizeof((array)[0]))
 
+#define STRINGIFY(arg) #arg
+#define STR(macro) STRINGIFY(macro)
+
 // RDTSC
 #if defined(__i386__)
 static __inline__ unsigned long long rdtsc(void)

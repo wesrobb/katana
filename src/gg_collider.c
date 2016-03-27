@@ -4,6 +4,7 @@ typedef struct {
     f32 min, max;
 } projection_t;
 
+// Project the specified points onto the specified axis.
 // We know there must be 4 points so don't bother passing in
 // the number of points.
 static projection_t project(v2 *points, v2 axis)
@@ -41,10 +42,10 @@ b8 collider_test(basis_t *a, basis_t *b)
     v2 b_y = v2_add(b->origin, b->y_axis);
     v2 b_points[] = {b->origin, b_x, b_y, v2_add(b_x, b->y_axis)};
 
-    // NOTE(Wes): Calculate normals. Base we are explicitly only supporting
+    // NOTE(Wes): Calculate normals. We are explicitly only supporting
     // rotated rects we only need to find the normal of one of the sides.
     // All other normals can be inferred from there onward.
-    // TODO(Wes): Do we want to deal with the case where the axis are not ortho?
+    // TODO(Wes): Do we want to deal with the case where the axes are not ortho?
     v2 a_normals[] = {v2_normalize(a->x_axis), v2_perp(a_normals[0])};
     v2 b_normals[] = {v2_normalize(b->x_axis), v2_perp(b_normals[0])};
 

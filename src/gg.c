@@ -174,8 +174,9 @@ static f32 test_wall(f32 test_x,
 static void update_entities(game_state_t *game_state, game_input_t *input)
 {
     world_t *world = &game_state->world;
-    v2 new_accels[GG_MAX_ENTITIES] = {0};
 
+    // NOTE(Wes): Save input data from each controller.
+    v2 new_accels[GG_MAX_ENTITIES] = {0};
     for (u32 i = 0; i < GG_MAX_CONTROLLERS; ++i) {
         u32 entity_index = world->controlled_entities[i];
         if (entity_index != 0) {
@@ -190,47 +191,6 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
                 entity->velocity.y = -80.0f;
             }
 
-            // Throw teleporter
-            if (controller->right_shoulder.ended_down && entity->type == entity_type_player &&
-                !entity->player.teleporter_index) {
-                entity->player.teleporter_index = get_next_entity(world->entities);
-                u32 teleporter_index = entity->player.teleporter_index;
-                if (teleporter_index != 0) {
-                    entity_t *teleporter_entity = &world->entities[teleporter_index];
-                    teleporter_entity->type = entity_type_teleporter;
-                    teleporter_entity->position = entity->position;
-                    teleporter_entity->velocity = entity->velocity;
-                    teleporter_entity->size.x = 2.0f;
-                    teleporter_entity->size.y = 2.0f;
-                    teleporter_entity->velocity_factor = -2.0f;
-                    teleporter_entity->acceleration_factor = 100.0f;
-                    teleporter_entity->teleporter.image = &game_state->green_teleporter;
-                    v2 left_stick;
-                    left_stick.x = controller->left_stick_x;
-                    left_stick.y = controller->left_stick_y;
-                    teleporter_entity->velocity = v2_mul(left_stick, teleporter_entity->acceleration_factor);
-                    // f32 acceleration_factor = 150.0f;
-                    // new_accels[entity->teleporter_index]
-                    // =
-                    //   v2_mul(left_stick,
-                    //   acceleration_factor);
-                }
-            }
-
-            // Attack
-            if (controller->action_right.ended_down && entity->type == entity_type_player &&
-                !entity->player.attacking) {
-                entity->player.attacking = 1;
-            }
-
-            // Teleport
-            if (controller->left_shoulder.ended_down && entity->type == entity_type_player &&
-                entity->player.teleporter_index) {
-                entity_t *teleporter_entity = &world->entities[entity->player.teleporter_index];
-                entity->position = teleporter_entity->position;
-                free_entity(world->entities, entity->player.teleporter_index);
-                entity->player.teleporter_index = 0;
-            }
 #endif
             // Move
             v2 left_stick = {0};
@@ -263,7 +223,7 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         v2 half_entity_size = v2_div(entity->size, 2.0f);
 
         // Gravity
-        //new_accel = v2_add(new_accel, world->gravity);
+        // new_accel = v2_add(new_accel, world->gravity);
 
         // NOTE(Wes): We always ray cast 4 times for movement:
         // If we are moving left we cast left from the left side at the
@@ -280,6 +240,8 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         v2 friction = v2_mul(entity->velocity, entity->velocity_factor);
         new_accel = v2_add(new_accel, friction);
 
+// TODO(Wes): Decide which position calculation we prefer.
+#if 1
         // Velocity verlet integration.
         v2 old_pos = entity->position;
         v2 average_accel = v2_div(v2_add(entity->acceleration, new_accel), 2);
@@ -288,7 +250,18 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         new_entity_pos = v2_add(old_pos, new_entity_pos);
         entity->velocity = v2_add(v2_mul(average_accel, input->delta_time), entity->velocity);
         entity->acceleration = new_accel;
+#else
+        // NOTE(Wes): Euler integration
+        v2 old_pos = entity->position;
+        v2 new_entity_pos = v2_mul(v2_mul(entity->acceleration, 0.5f), input->delta_time * input->delta_time);
+        new_entity_pos = v2_add(v2_mul(entity->velocity, input->delta_time), new_entity_pos);
+        new_entity_pos = v2_add(old_pos, new_entity_pos);
+        entity->velocity = v2_add(v2_mul(new_accel, input->delta_time), entity->velocity);
+        entity->acceleration = new_accel;
+#endif
 
+        entity->position = new_entity_pos;
+        return;
         v2 pos_delta = v2_sub(new_entity_pos, old_pos);
 
         // NOTE(Wes): Collision detection
@@ -309,13 +282,13 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         f32 t_min = 1.0f; // Full movement has occurred at time = 1.0f.  
         // NOTE(Wes): We use != to check against the max tile to get around integer overflow
         //            when reaching edge of the tilemap.
-#if 0   
+#if 1   
         for (u32 y = min_tile_y; y != max_tile_y; y++) {
             for (u32 x = min_tile_x; x != max_tile_x; x++) {
                 unsigned char *tile = get_tile(tilemap, x, y);
                 if (tile && !is_tile_empty(tile)) {
                     v2 min_corner = V2(x, y);
-                    v2 max_corner = V2(x + tilemap->tile_size.x, x + tilemap->tile_size.y); 
+                    v2 max_corner = V2(x + tilemap->tile_size.x, y + tilemap->tile_size.y); 
                     t_min = test_wall(new_entity_pos.x,
                                       new_entity_pos.y,
                                       min_corner.x,
@@ -329,19 +302,15 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         }
 #endif
 
-        //entity->position = v2_add(old_pos, v2_mul(pos_delta, t_min));
-        entity->position = new_entity_pos;
-
-        // Track entity positions for the camera
-        if (entity->type == entity_type_player) {
-            game_state->world.camera_tracked_positions[i] = entity->position;
-        }
+        entity->position = v2_add(old_pos, v2_mul(pos_delta, t_min));
+        //entity->position = new_entity_pos;
     }
 }
 
 static image_t load_image(const char *path, load_file_fn load_file)
 {
     // TODO(Wes): Add error checking and handle allocation on behalf of stb.
+    // TODO(Wes): This should be hidden behind an abstraction exposed in the platform layer.
     image_t result = {0};
     loaded_file_t loaded_file = load_file(path);
     int unused = 0;
@@ -461,9 +430,6 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
             entity->exists = 1;
             entity->velocity_factor = -7.0f; // Drag
             entity->acceleration_factor = 150.0f;
-            entity->player.walk.frames = &game_state->player_image;
-            entity->player.walk.max_frames = 1;
-            entity->player.walk.fps = 24.0f;
         }
     }
 
@@ -475,31 +441,10 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
     v2 min_pos = V2(FLT_MAX, FLT_MAX);
     v2 max_pos = V2(FLT_MIN, FLT_MIN);
     b8 tracked_pos_found = 0;
-    for (u32 i = 0; i < GG_MAX_ENTITIES; ++i) {
-        v2 tracked_pos = game_state->world.camera_tracked_positions[i];
-        if (tracked_pos.x != 0.0f && tracked_pos.y != 0.0f) {
-            tracked_pos_found = 1;
-            if (tracked_pos.x < min_pos.x) {
-                min_pos.x = tracked_pos.x;
-            }
-            if (tracked_pos.y < min_pos.y) {
-                min_pos.y = tracked_pos.y;
-            }
-            if (tracked_pos.x > max_pos.x) {
-                max_pos.x = tracked_pos.x;
-            }
-            if (tracked_pos.y > max_pos.y) {
-                max_pos.y = tracked_pos.y;
-            }
-        }
-    }
-    // TODO(Wes): Override camera tracking and just watch the whole tilemap...
-    // for now.
-    // This should be removed sometime.
+
     min_pos = V2(0, 0);
     tilemap_t *tilemap = &game_state->world.tilemap;
     max_pos = V2(tilemap->tile_size.x * tilemap->tiles_wide, tilemap->tile_size.y * tilemap->tiles_high);
-    memset(game_state->world.camera_tracked_positions, 0, GG_MAX_ENTITIES * sizeof(v2));
 
     v2 camera_edge_buffer = V2(0.0f, 0.0f);
     min_pos = v2_sub(min_pos, camera_edge_buffer);
@@ -549,7 +494,7 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
     }
 #endif
     // NOTE(Wes): Start by clearing the screen.
-    //render_push_clear(game_state->render_queue, COLOR(1.0f, 1.0f, 1.0f, 1.0f));
+    render_push_clear(game_state->render_queue, COLOR(1.0f, 1.0f, 1.0f, 1.0f));
     game_state->elapsed_time += input->delta_time;
     f32 angle = game_state->elapsed_time * 0.5f;
     v2 light_origin = v2_mul(V2(kcosf(angle), ksinf(angle)), 10);
@@ -601,17 +546,6 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
         }
 
         if (entity->type == entity_type_player) {
-            entity_anim_t *anim;
-            anim = &entity->player.walk;
-            if (input->controllers[i].left_stick_x != 0.0f) {
-                f32 anim_fps = kabsf(input->controllers[i].left_stick_x) * anim->fps;
-                if (anim->accumulator + input->delta_time >= (1.0f / anim_fps)) {
-                    anim->current_frame = ++anim->current_frame % anim->max_frames;
-                    anim->accumulator = 0;
-                } else {
-                    anim->accumulator += input->delta_time;
-                }
-            }
             v2 draw_offset = V2(-4.0f, -2.7f);
             v2 size = V2(8.0f, 5.0f);
             v2 draw_pos = v2_add(entity->position, draw_offset);
@@ -619,15 +553,15 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
             render_push_rotated_block(game_state->render_queue,
                                       &player_basis,
                                       V4(1.0f, 1.0f, 1.0f, 1.0f),
-                                      &anim->frames[anim->current_frame],
+                                      &game_state->player_image,
                                       &game_state->player_normal,
                                       &light,
                                       1);
         }
     }
 
-#if 0
-    v2 o = {{50.0f, 26.0f}};
+#if 1
+    v2 o = {{60.0f, 26.0f}};
     v2 x = {{20.0f, 2.0f}};
     v2 y = v2_perp(x);
     v2 o2 = {{70.0f, 30.0f}};
@@ -648,9 +582,6 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
     render_draw_queue(game_state->render_queue, frame_buffer);
 
     output_sine_wave(game_state, audio);
-
-    // NOTE(Wes): Free transient frame memory.
-    game_state->frame_arena.index = 0;
 
     END_COUNTER(game_update_and_render);
 }
