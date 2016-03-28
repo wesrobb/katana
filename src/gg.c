@@ -171,7 +171,7 @@ static f32 test_wall(f32 test_x,
     return t_min;
 }
 
-static void update_entities(game_state_t *game_state, game_input_t *input)
+static void update_entities(game_state_t *game_state, game_input_t *input, log_fn log)
 {
     world_t *world = &game_state->world;
 
@@ -203,6 +203,12 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
                 }
                 if (controller->move_right.ended_down) {
                     left_stick.x = 1.0f;
+                }
+                if (controller->move_up.ended_down) {
+                    left_stick.y = -1.0f;
+                }
+                if (controller->move_down.ended_down) {
+                    left_stick.y = 1.0f;
                 }
             }
             new_accels[entity_index] = v2_mul(left_stick, entity->acceleration_factor);
@@ -258,8 +264,6 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         entity->acceleration = new_accel;
 #endif
 
-        entity->position = new_entity_pos;
-        return;
         v2 pos_delta = v2_sub(new_entity_pos, old_pos);
 
         // NOTE(Wes): Collision detection
@@ -268,14 +272,14 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
         //            velocity from that point in a direction that is "safe".
         v2 min_pos = V2(kmin(new_entity_pos.x, old_pos.x), 
                         kmin(new_entity_pos.y, old_pos.y));
-        v2 max_pos = V2(kmax(new_entity_pos.x, old_pos.x), 
-                        kmax(new_entity_pos.y, old_pos.y));
+        v2 max_pos = V2(kmax(new_entity_pos.x + entity->size.x, old_pos.x + entity->size.x), 
+                        kmax(new_entity_pos.y + entity->size.y, old_pos.y + entity->size.y));
 
         tilemap_t *tilemap = &world->tilemap;
-        u32 min_tile_x = (u32)(min_pos.x / tilemap->tile_size.x);
-        u32 max_tile_x = (u32)(max_pos.x / tilemap->tile_size.x) + 1;
-        u32 min_tile_y = (u32)(min_pos.y / tilemap->tile_size.y);
-        u32 max_tile_y = (u32)(max_pos.y / tilemap->tile_size.y) + 1;
+        u32 min_tile_x = (u32)(min_pos.x / (tilemap->tile_size.x));
+        u32 max_tile_x = (u32)(max_pos.x / (tilemap->tile_size.x)) + 1;
+        u32 min_tile_y = (u32)(min_pos.y / (tilemap->tile_size.y));
+        u32 max_tile_y = (u32)(max_pos.y / (tilemap->tile_size.y)) + 1;
 
         f32 t_min = 1.0f; // Full movement has occurred at time = 1.0f.  
         // NOTE(Wes): We use != to check against the max tile to get around integer overflow
@@ -285,22 +289,58 @@ static void update_entities(game_state_t *game_state, game_input_t *input)
             for (u32 x = min_tile_x; x != max_tile_x; x++) {
                 unsigned char *tile = get_tile(tilemap, x, y);
                 if (tile && !is_tile_empty(tile)) {
-                    v2 min_corner = V2(x, y);
-                    v2 max_corner = V2(x + tilemap->tile_size.x, y + tilemap->tile_size.y); 
-                    t_min = test_wall(new_entity_pos.x,
-                                      new_entity_pos.y,
+
+                    // Add the entity->size to the corners to take into account the entire size of the entity.
+                    // This is a form of Minkowski Sum.
+                    // TODO(Wes): Consider moving to a system where the entity position represents its center
+                    // and not it's top left.
+                    v2 min_corner = V2(x * tilemap->tile_size.x, y * tilemap->tile_size.y);
+                    min_corner = v2_sub(min_corner, entity->size);
+                    v2 max_corner = v2_add(min_corner, tilemap->tile_size);
+                    max_corner = v2_add(max_corner, entity->size);
+
+                    // Test left wall
+                    t_min = test_wall(old_pos.x,
+                                      old_pos.y,
+                                      max_corner.x,
+                                      min_corner.y,
+                                      max_corner.y,
+                                      pos_delta.x,
+                                      pos_delta.y,
+                                      t_min);
+                    // Test right wall
+                    t_min = test_wall(old_pos.x,
+                                      old_pos.y,
                                       min_corner.x,
                                       min_corner.y,
                                       max_corner.y,
                                       pos_delta.x,
                                       pos_delta.y,
                                       t_min);
+                    // Test bottom wall
+                    t_min = test_wall(old_pos.y,
+                                      old_pos.x,
+                                      max_corner.y,
+                                      min_corner.x,
+                                      max_corner.x,
+                                      pos_delta.y,
+                                      pos_delta.x,
+                                      t_min);
+                    // Test top wall
+                    t_min = test_wall(old_pos.y,
+                                      old_pos.x,
+                                      min_corner.y,
+                                      min_corner.x,
+                                      max_corner.x,
+                                      pos_delta.y,
+                                      pos_delta.x,
+                                      t_min);
                 }
             }
         }
 #endif
 
-        entity->position = v2_add(old_pos, v2_mul(pos_delta, t_min));
+        entity->position = v2_add(old_pos, v2_mul(pos_delta, t_min - collision_buffer));
         //entity->position = new_entity_pos;
     }
 }
@@ -396,7 +436,7 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
 
         game_state->background_image = load_image("data/background/Bg 1.png", callbacks->load_file);
         game_state->tile_image = load_image("data/tiles/Box 01.png", callbacks->load_file);
-        game_state->player_image = load_image("data/player/walk_with_sword/1.png", callbacks->load_file);
+        game_state->player_image = load_image("data/player/test.png", callbacks->load_file);
         game_state->player_normal = load_image("data/sphere_normals.png", callbacks->load_file);
 
         init_arena(&game_state->arena,
@@ -422,7 +462,7 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
             entity_t *entity = &game_state->world.entities[controlled_entity];
             entity->type = entity_type_player;
             entity->position.x = 50.0f;
-            entity->position.y = 50.0f;
+            entity->position.y = 54.0f;
             entity->size.x = 2.0f;
             entity->size.y = 4.0f;
             entity->exists = 1;
@@ -431,7 +471,7 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
         }
     }
 
-    update_entities(game_state, input);
+    update_entities(game_state, input, callbacks->log);
 
     // Update draw offset and units_to_pixels so that camera always sees all
     // players
@@ -544,10 +584,9 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
         }
 
         if (entity->type == entity_type_player) {
-            v2 draw_offset = V2(-4.0f, -2.7f);
-            v2 size = V2(8.0f, 5.0f);
+            v2 draw_offset = V2(0.0f, 0.0f);
             v2 draw_pos = v2_add(entity->position, draw_offset);
-            basis_t player_basis = {draw_pos, V2(size.x, 0.0f), V2(0.0f, size.y)};
+            basis_t player_basis = {draw_pos, V2(entity->size.x, 0.0f), V2(0.0f, entity->size.y)};
             render_push_rotated_block(game_state->render_queue,
                                       &player_basis,
                                       V4(1.0f, 1.0f, 1.0f, 1.0f),

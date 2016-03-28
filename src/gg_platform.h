@@ -194,11 +194,13 @@ typedef struct {
 
 typedef loaded_file_t (*load_file_fn)(const char *filename);
 typedef void (*unload_file_fn)(loaded_file_t *);
+typedef void(*log_fn)(const char*, ...);
 
 // TODO(Wes): Pass these once during game_init or something.
 typedef struct {
     load_file_fn load_file;
     unload_file_fn unload_file;
+	log_fn log;
 } game_callbacks_t;
 
 DLL_FN void game_update_and_render(game_memory_t *memory,

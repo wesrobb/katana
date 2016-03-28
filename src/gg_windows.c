@@ -3,6 +3,8 @@
 #include "SDL.h"
 
 #include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
 
 #include <Windows.h>
 
@@ -27,7 +29,7 @@ typedef struct {
 } win_game_dll_paths_t;
 
 typedef struct {
-	void *dll;
+    void *dll;
     FILETIME dll_last_modified;
     game_update_and_render_fn_t update_and_render_fn;
 } win_game_t;
@@ -43,17 +45,17 @@ typedef struct {
 static win_game_dll_paths_t win_get_game_dll_paths()
 {
     char exe_path[1024] = {0};
-	DWORD path_len = GetModuleFileName(0, exe_path, 1024);
-	if (path_len != 0)
-	{
+    DWORD path_len = GetModuleFileName(0, exe_path, 1024);
+    if (path_len != 0)
+    {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                     "Exe path is:  %s",
                     exe_path);
-	}
-	else
-	{
+    }
+    else
+    {
         // TODO(Wes) : Handle failure to get exe path.
-	}
+    }
 
     u32 last_slash = 0;
     for (u32 i = 0; i < path_len; ++i) {
@@ -84,17 +86,17 @@ static void win_load_game(win_game_t *game, const char *game_so_path)
 
 static FILETIME win_get_last_modified(char *path)
 {
-	WIN32_FILE_ATTRIBUTE_DATA data;
-	if (GetFileAttributesEx(path, GetFileExInfoStandard, &data) == 0)
-	{
+    WIN32_FILE_ATTRIBUTE_DATA data;
+    if (GetFileAttributesEx(path, GetFileExInfoStandard, &data) == 0)
+    {
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-			"Failed to get the last modified time for file %s. Windows error code %d",
+            "Failed to get the last modified time for file %s. Windows error code %d",
                     path, GetLastError());
-		FILETIME f = { 0 };
-		return f;
-	}
+        FILETIME f = { 0 };
+        return f;
+    }
 
-	return data.ftLastWriteTime;
+    return data.ftLastWriteTime;
 }
 
 static void win_init_kb(game_input_t *input, u32 controller_index)
@@ -304,14 +306,14 @@ static game_memory_t win_allocate_game_memory(void *base_address)
     memory.permanent_store_size = Megabytes(64);
     memory.transient_store_size = Megabytes(512);
 
-	u64 total_size = memory.transient_store_size + memory.permanent_store_size;
-	void *buffer = VirtualAlloc(base_address,
-							    (size_t)total_size,
-							    MEM_RESERVE | MEM_COMMIT,
-							    PAGE_READWRITE);
+    u64 total_size = memory.transient_store_size + memory.permanent_store_size;
+    void *buffer = VirtualAlloc(base_address,
+                                (size_t)total_size,
+                                MEM_RESERVE | MEM_COMMIT,
+                                PAGE_READWRITE);
 
-	memory.permanent_store = (u8 *)buffer;
-	memory.transient_store = memory.permanent_store + memory.permanent_store_size;
+    memory.permanent_store = (u8 *)buffer;
+    memory.transient_store = memory.permanent_store + memory.permanent_store_size;
 
     return memory;
 }
@@ -326,37 +328,37 @@ static void win_copy_game_memory(game_memory_t *dst, game_memory_t *src)
 
 static loaded_file_t win_load_file(const char *path)
 {
-	loaded_file_t file = { 0 };
-	SDL_RWops *sdl_rwops = SDL_RWFromFile(path, "rb");
+    loaded_file_t file = { 0 };
+    SDL_RWops *sdl_rwops = SDL_RWFromFile(path, "rb");
 
-	if (!sdl_rwops) {
+    if (!sdl_rwops) {
         SDL_LogError(
             SDL_LOG_CATEGORY_APPLICATION, "Failed to open file %s", path);
-		return file;
-	}
+        return file;
+    }
 
     // Get file size
-	file.size = SDL_RWsize(sdl_rwops);
-	file.contents = VirtualAlloc(0,
-							     (size_t)file.size, 
+    file.size = SDL_RWsize(sdl_rwops);
+    file.contents = VirtualAlloc(0,
+                                 (size_t)file.size, 
                                  MEM_RESERVE | MEM_COMMIT,
-							     PAGE_READWRITE);
-	if (!file.contents) {
+                                 PAGE_READWRITE);
+    if (!file.contents) {
         SDL_LogError(
             SDL_LOG_CATEGORY_APPLICATION, "Failed to allocate memory when attempting to open file %s", path);
-		return file;
-	}
+        return file;
+    }
 
-	size_t nb_read_total = 0;
-	size_t nb_read = 1;
-	char* buf = file.contents;
-	while (nb_read_total < file.size && nb_read != 0) {
-		nb_read = SDL_RWread(sdl_rwops, buf, 1, ((size_t)file.size - nb_read_total));
-		nb_read_total += nb_read;
-		buf += nb_read;
-	}
+    size_t nb_read_total = 0;
+    size_t nb_read = 1;
+    char* buf = file.contents;
+    while (nb_read_total < file.size && nb_read != 0) {
+        nb_read = SDL_RWread(sdl_rwops, buf, 1, ((size_t)file.size - nb_read_total));
+        nb_read_total += nb_read;
+        buf += nb_read;
+    }
 
-	SDL_RWclose(sdl_rwops);
+    SDL_RWclose(sdl_rwops);
 
     return file;
 }
@@ -364,7 +366,18 @@ static loaded_file_t win_load_file(const char *path)
 static void win_unload_file(loaded_file_t *loaded_file)
 {
     assert(loaded_file);
-	VirtualFree(loaded_file->contents, 0, MEM_RELEASE);
+    VirtualFree(loaded_file->contents, 0, MEM_RELEASE);
+}
+
+static void win_log(const char* format, ...)
+{
+    assert(format);
+    char buffer[256];
+    va_list args;
+    va_start(args, format);
+    vsprintf(buffer, format, args);
+    va_end(args);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, buffer);
 }
 
 static void win_handle_debug_counters(game_memory_t *memory, b8 must_print)
@@ -491,21 +504,22 @@ int main(int argc, char *argv[])
     audio.sample_count = audio_spec_want.samples;
 
     win_game_record_t game_record = {0};
-	game_record.input_events = VirtualAlloc(0,
-											sizeof(game_input_t) * GG_MAX_RECORDED_INPUT_EVENTS,
-											MEM_RESERVE | MEM_COMMIT,
-											PAGE_READWRITE);
+    game_record.input_events = VirtualAlloc(0,
+                                            sizeof(game_input_t) * GG_MAX_RECORDED_INPUT_EVENTS,
+                                            MEM_RESERVE | MEM_COMMIT,
+                                            PAGE_READWRITE);
     game_record.memory = win_allocate_game_memory((void *)Terabytes(4));
 
     game_callbacks_t callbacks = {0};
     callbacks.load_file = &win_load_file;
     callbacks.unload_file = &win_unload_file;
+    callbacks.log = &win_log;
 
     u64 last_time = SDL_GetPerformanceCounter();
     u64 perf_freq = SDL_GetPerformanceFrequency();
     i32 frame_counter = 0;
     f32 frame_sec = 1.0f / GG_TARGET_FPS;
-	f32 frame_accumulator = 0.0f;
+    f32 frame_accumulator = 0.0f;
     SDL_Event event;
     b8 recording = false;
     b8 playing_back = false;
@@ -628,7 +642,7 @@ int main(int argc, char *argv[])
         new_input = old_input;
         old_input = temp;
 
-		u64 current_time = SDL_GetPerformanceCounter();
+        u64 current_time = SDL_GetPerformanceCounter();
         frame_sec = (current_time - last_time) / (f32)perf_freq;
         frame_accumulator += frame_sec;
         last_time = current_time;
