@@ -7,9 +7,9 @@
 
 // Note(Wes): Vectors
 typedef union {
-	struct {
-		i32 x, y;
-	};
+    struct {
+        i32 x, y;
+    };
     i32 v[2];
 } v2i;
 
@@ -103,6 +103,11 @@ typedef union {
         }                                                                                                              \
     }
 
+inline v2 v2_zero()
+{
+    return V2(0.0f, 0.0f);
+}
+
 inline v2 v2_add(v2 a, v2 b)
 {
     return V2(a.x + b.x, a.y + b.y);
@@ -155,12 +160,12 @@ inline v2 v2_normalize(v2 a)
 
 inline v2i v2_floor(v2 a)
 {
-	return V2I(kfloor(a.x), kfloor(a.y));
+    return V2I(kfloor(a.x), kfloor(a.y));
 }
 
 inline v2i v2_ceil(v2 a)
 {
-	return V2I(kceil(a.x), kceil(a.y));
+    return V2I(kceil(a.x), kceil(a.y));
 }
 
 inline void v2_round2(v2 a, v2 b, v2i *a_result, v2i *b_result)
@@ -176,9 +181,9 @@ inline void v2_round2(v2 a, v2 b, v2i *a_result, v2i *b_result)
     lhs[2] = b.x;
     lhs[3] = b.y;
 
-	__m128 packed_args = _mm_load_ps(lhs);
-	__m128 packed_result = _mm_round_ps(packed_args, _MM_FROUND_TO_NEAREST_INT);
-	_mm_store_ps(results, packed_result);
+    __m128 packed_args = _mm_load_ps(lhs);
+    __m128 packed_result = _mm_round_ps(packed_args, _MM_FROUND_TO_NEAREST_INT);
+    _mm_store_ps(results, packed_result);
 
     a_result->x = (i32)results[0];
     a_result->y = (i32)results[1];
@@ -199,9 +204,9 @@ inline void v2_floor2(v2 a, v2 b, v2i *a_result, v2i *b_result)
     lhs[2] = b.x;
     lhs[3] = b.y;
 
-	__m128 packed_args = _mm_load_ps(lhs);
-	__m128 packed_result = _mm_floor_ps(packed_args);
-	_mm_store_ps(results, packed_result);
+    __m128 packed_args = _mm_load_ps(lhs);
+    __m128 packed_result = _mm_floor_ps(packed_args);
+    _mm_store_ps(results, packed_result);
 
     a_result->x = (i32)results[0];
     a_result->y = (i32)results[1];
@@ -223,8 +228,8 @@ inline void v2_ceil2(v2 a, v2 b, v2i *a_result, v2i *b_result)
     lhs[3] = b.y;
 
     __m128 packed_args = _mm_load_ps(lhs);
-	__m128 packed_result = _mm_ceil_ps(packed_args);
-	_mm_store_ps(results, packed_result);;
+    __m128 packed_result = _mm_ceil_ps(packed_args);
+    _mm_store_ps(results, packed_result);;
 
     a_result->x = (i32)results[0];
     a_result->y = (i32)results[1];

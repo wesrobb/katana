@@ -145,30 +145,32 @@ static b8 is_tile_empty(unsigned char *tile)
     return *tile == 0;
 }
 
-static f32 test_wall(f32 test_x, 
-                     f32 test_y, 
-                     f32 wall_x, 
-                     f32 wall_y_min, 
-                     f32 wall_y_max, 
-                     f32 move_delta_x, 
-                     f32 move_delta_y, 
-                     f32 t_min)
+static b8 test_wall(f32 test_x, 
+                    f32 test_y, 
+                    f32 wall_x, 
+                    f32 wall_y_min, 
+                    f32 wall_y_max, 
+                    f32 move_delta_x, 
+                    f32 move_delta_y, 
+                    f32* t_min)
 {
     if (move_delta_x == 0.0f) {
-        return t_min;
+        return 0;
     }
 
     f32 t = (wall_x - test_x) / move_delta_x;
-    if (t >= 0.0f && t < t_min)
+    if (t >= 0.0f && t < *t_min)
     {
         f32 y = test_y + t*move_delta_y;
         if (y >= wall_y_min && y <= wall_y_max)
         {
-            return t;
+            const f32 t_epsilon = 0.001f;
+            *t_min = t - t_epsilon;
+            return 1;
         }
     }
 
-    return t_min;
+    return 0;
 }
 
 static void update_entities(game_state_t *game_state, game_input_t *input, log_fn log)
@@ -223,7 +225,6 @@ static void update_entities(game_state_t *game_state, game_input_t *input, log_f
 
         // Ensures we never move exactly onto the tile we are colliding
         // with.
-        f32 collision_buffer = 0.001f;
         v2 new_accel = new_accels[i];
 
         // Gravity
@@ -247,33 +248,32 @@ static void update_entities(game_state_t *game_state, game_input_t *input, log_f
 // TODO(Wes): Decide which position calculation we prefer.
 #if 1
         // Velocity verlet integration.
-        v2 old_pos = entity->position;
         v2 average_accel = v2_div(v2_add(entity->acceleration, new_accel), 2);
         v2 new_entity_pos = v2_mul(v2_mul(entity->acceleration, 0.5f), input->delta_time * input->delta_time);
         new_entity_pos = v2_add(v2_mul(entity->velocity, input->delta_time), new_entity_pos);
-        new_entity_pos = v2_add(old_pos, new_entity_pos);
+        new_entity_pos = v2_add(entity->position, new_entity_pos);
         entity->velocity = v2_add(v2_mul(average_accel, input->delta_time), entity->velocity);
         entity->acceleration = new_accel;
 #else
         // NOTE(Wes): Euler integration
-        v2 old_pos = entity->position;
+        v2 entity->position = entity->position;
         v2 new_entity_pos = v2_mul(v2_mul(entity->acceleration, 0.5f), input->delta_time * input->delta_time);
         new_entity_pos = v2_add(v2_mul(entity->velocity, input->delta_time), new_entity_pos);
-        new_entity_pos = v2_add(old_pos, new_entity_pos);
+        new_entity_pos = v2_add(entity->position, new_entity_pos);
         entity->velocity = v2_add(v2_mul(new_accel, input->delta_time), entity->velocity);
         entity->acceleration = new_accel;
 #endif
 
-        v2 pos_delta = v2_sub(new_entity_pos, old_pos);
+        v2 pos_delta = v2_sub(new_entity_pos, entity->position);
 
         // NOTE(Wes): Collision detection
         //            Check that the intended position of the player is on a tile that is empty.
         //            Otherwise find the closest position to the edge of the tile and continue
         //            velocity from that point in a direction that is "safe".
-        v2 min_pos = V2(kmin(new_entity_pos.x, old_pos.x), 
-                        kmin(new_entity_pos.y, old_pos.y));
-        v2 max_pos = V2(kmax(new_entity_pos.x + entity->size.x, old_pos.x + entity->size.x), 
-                        kmax(new_entity_pos.y + entity->size.y, old_pos.y + entity->size.y));
+        v2 min_pos = V2(kmin(new_entity_pos.x, entity->position.x), 
+                        kmin(new_entity_pos.y, entity->position.y));
+        v2 max_pos = V2(kmax(new_entity_pos.x + entity->size.x, entity->position.x + entity->size.x), 
+                        kmax(new_entity_pos.y + entity->size.y, entity->position.y + entity->size.y));
 
         tilemap_t *tilemap = &world->tilemap;
         u32 min_tile_x = (u32)(min_pos.x / (tilemap->tile_size.x));
@@ -281,67 +281,82 @@ static void update_entities(game_state_t *game_state, game_input_t *input, log_f
         u32 min_tile_y = (u32)(min_pos.y / (tilemap->tile_size.y));
         u32 max_tile_y = (u32)(max_pos.y / (tilemap->tile_size.y)) + 1;
 
-        f32 t_min = 1.0f; // Full movement has occurred at time = 1.0f.  
-        // NOTE(Wes): We use != to check against the max tile to get around integer overflow
-        //            when reaching edge of the tilemap.
-#if 1   
-        for (u32 y = min_tile_y; y != max_tile_y; y++) {
-            for (u32 x = min_tile_x; x != max_tile_x; x++) {
-                unsigned char *tile = get_tile(tilemap, x, y);
-                if (tile && !is_tile_empty(tile)) {
+        f32 t_remaining = 1.0f; // Full movement has occurred at time = 1.0f.
+        for (u32 collision_iter = 0; collision_iter < 4 && t_remaining > 0.0f; collision_iter++)
+        {
+            f32 t_min = 1.0f; 
+            v2 wall_normal = {0}; // Used to glide the player off the wall using his existing velocity.
+            // NOTE(Wes): We use != to check against the max tile to get around integer overflow
+            //            when reaching edge of the tilemap.
+            for (u32 y = min_tile_y; y != max_tile_y; y++) {
+                for (u32 x = min_tile_x; x != max_tile_x; x++) {
+                    unsigned char *tile = get_tile(tilemap, x, y);
+                    if (tile && !is_tile_empty(tile)) {
 
-                    // Add the entity->size to the corners to take into account the entire size of the entity.
-                    // This is a form of Minkowski Sum.
-                    // TODO(Wes): Consider moving to a system where the entity position represents its center
-                    // and not it's top left.
-                    v2 min_corner = V2(x * tilemap->tile_size.x, y * tilemap->tile_size.y);
-                    min_corner = v2_sub(min_corner, entity->size);
-                    v2 max_corner = v2_add(min_corner, tilemap->tile_size);
-                    max_corner = v2_add(max_corner, entity->size);
+                        // Add the entity->size to the corners to take into account the entire size of the entity.
+                        // This is a form of Minkowski Sum.
+                        // TODO(Wes): Consider moving to a system where the entity position represents its center
+                        // and not it's top left.
+                        v2 min_corner = V2(x * tilemap->tile_size.x, y * tilemap->tile_size.y);
+                        min_corner = v2_sub(min_corner, entity->size);
+                        v2 max_corner = v2_add(min_corner, tilemap->tile_size);
+                        max_corner = v2_add(max_corner, entity->size);
 
-                    // Test left wall
-                    t_min = test_wall(old_pos.x,
-                                      old_pos.y,
-                                      max_corner.x,
-                                      min_corner.y,
-                                      max_corner.y,
-                                      pos_delta.x,
-                                      pos_delta.y,
-                                      t_min);
-                    // Test right wall
-                    t_min = test_wall(old_pos.x,
-                                      old_pos.y,
-                                      min_corner.x,
-                                      min_corner.y,
-                                      max_corner.y,
-                                      pos_delta.x,
-                                      pos_delta.y,
-                                      t_min);
-                    // Test bottom wall
-                    t_min = test_wall(old_pos.y,
-                                      old_pos.x,
-                                      max_corner.y,
-                                      min_corner.x,
-                                      max_corner.x,
-                                      pos_delta.y,
-                                      pos_delta.x,
-                                      t_min);
-                    // Test top wall
-                    t_min = test_wall(old_pos.y,
-                                      old_pos.x,
-                                      min_corner.y,
-                                      min_corner.x,
-                                      max_corner.x,
-                                      pos_delta.y,
-                                      pos_delta.x,
-                                      t_min);
+                        // Test left wall
+                        if (test_wall(entity->position.x,
+                            entity->position.y,
+                            max_corner.x,
+                            min_corner.y,
+                            max_corner.y,
+                            pos_delta.x,
+                            pos_delta.y,
+                            &t_min)) {
+                            wall_normal = V2(1.0f, 0.0f);
+                        }
+                        // Test right wall
+                        if (test_wall(entity->position.x,
+                            entity->position.y,
+                            min_corner.x,
+                            min_corner.y,
+                            max_corner.y,
+                            pos_delta.x,
+                            pos_delta.y,
+                            &t_min)) {
+                            wall_normal = V2(-1.0f, 0.0f);
+                        }
+                        // Test bottom wall
+                        if (test_wall(entity->position.y,
+                            entity->position.x,
+                            max_corner.y,
+                            min_corner.x,
+                            max_corner.x,
+                            pos_delta.y,
+                            pos_delta.x,
+                            &t_min)) {
+                            wall_normal = V2(0.0f, 1.0f);
+                        }
+                        // Test top wall
+                        if (test_wall(entity->position.y,
+                            entity->position.x,
+                            min_corner.y,
+                            min_corner.x,
+                            max_corner.x,
+                            pos_delta.y,
+                            pos_delta.x,
+                            &t_min)) {
+                            wall_normal = V2(0.0f, -1.0f);
+                        }
+                    }
                 }
             }
-        }
-#endif
+            entity->position = v2_add(entity->position, v2_mul(pos_delta, t_min));
 
-        entity->position = v2_add(old_pos, v2_mul(pos_delta, t_min - collision_buffer));
-        //entity->position = new_entity_pos;
+            // If we've hit a wall then wall_normal will be non-zero.
+            entity->velocity = v2_sub(entity->velocity, v2_mul(wall_normal, v2_dot(entity->velocity, wall_normal)));
+            pos_delta = v2_sub(pos_delta, v2_mul(wall_normal, v2_dot(pos_delta, wall_normal)));
+
+            t_remaining -= t_remaining * t_min;
+        }
     }
 }
 
