@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Werror -std=c11 -msse4 -fPIC -ffast-math 
-RELEASE_FLAGS = -O2
+RELEASE_FLAGS = -O2 -g
 DEBUG_FLAGS = -O0 -g -ggdb
 DEFINES = -DGG_INTERNAL -DGAME_DLL=gg.so -DGAME_TEMP_DLL=gg_temp.so
 DEFINES_D = -DGG_DEBUG -DGG_INTERNAL -DGAME_DLL=gg_d.so -DGAME_TEMP_DLL=gg_temp_d.so 

@@ -339,8 +339,8 @@ int main(void)
 
     i32 window_width = 960;
     i32 window_height = 540;
-    i32 windoy_pos_x = 10;
-    i32 windoy_pos_y = 400;
+    i32 windoy_pos_x = 0;
+    i32 windoy_pos_y = 450;
 
     SDL_Window *window = SDL_CreateWindow("gg", windoy_pos_x, windoy_pos_y,
                                           window_width, window_height, SDL_WINDOW_RESIZABLE);
