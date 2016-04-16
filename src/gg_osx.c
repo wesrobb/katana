@@ -331,10 +331,48 @@ static void osx_handle_debug_counters(game_memory_t *memory, b8 must_print)
 #endif
 }
 
+// Queue stuff ===============================
+typedef struct {
+    void (*work_fn) (void*);
+    void *data;
+} work_entry_t;
+
+#define RINGBUFFER_SIZE 1024
+typedef struct {
+    work_entry_t work_entries[RINGBUFFER_SIZE];
+    int entry_count;
+} ringbuffer_t;
+// ===========================================
+
+// Thread stuff
+// ===========================================
+int thread_fn(void *data)
+{
+    // Do some work.
+    char *msg = (char *)data;
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, msg);
+    SDL_Delay(5000);
+    return 1;
+}
+#define WORKER_THREAD_COUNT 4
+// ===========================================
+
 int main(void)
 {
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
         // TODO(Wes): SDL_Init didn't work!
+    }
+
+    SDL_Thread* threads[WORKER_THREAD_COUNT];
+    for (u32 i = 0; i < WORKER_THREAD_COUNT; i++) {
+        char *msg = "Hello thread!";
+        threads[i] = SDL_CreateThread(thread_fn, "Worker", (void *)msg);
+    }
+
+    int threadReturnValue;
+
+    for (u32 i = 0; i < WORKER_THREAD_COUNT; i++) {
+        SDL_WaitThread(threads[i], &threadReturnValue);
     }
 
     i32 window_width = 960;
