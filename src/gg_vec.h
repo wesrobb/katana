@@ -103,72 +103,72 @@ typedef union {
         }                                                                                                              \
     }
 
-inline v2 v2_zero()
+static inline v2 v2_zero()
 {
     return V2(0.0f, 0.0f);
 }
 
-inline v2 v2_add(v2 a, v2 b)
+static inline v2 v2_add(v2 a, v2 b)
 {
     return V2(a.x + b.x, a.y + b.y);
 }
 
-inline v2 v2_sub(v2 a, v2 b)
+static inline v2 v2_sub(v2 a, v2 b)
 {
     return V2(a.x - b.x, a.y - b.y);
 }
 
-inline v2 v2_mul(v2 a, f32 scalar)
+static inline v2 v2_mul(v2 a, f32 scalar)
 {
     return V2(a.x * scalar, a.y * scalar);
 }
 
-inline v2 v2_div(v2 a, f32 scalar)
+static inline v2 v2_div(v2 a, f32 scalar)
 {
     return V2(a.x / scalar, a.y / scalar);
 }
 
-inline v2 v2_perp(v2 a)
+static inline v2 v2_perp(v2 a)
 {
     return V2(-a.y, a.x);
 }
 
-inline v2 v2_neg(v2 a)
+static inline v2 v2_neg(v2 a)
 {
     return V2(-a.x, -a.y);
 }
 
-inline f32 v2_dot(v2 a, v2 b)
+static inline f32 v2_dot(v2 a, v2 b)
 {
     return (a.x * b.x) + (a.y * b.y);
 }
 
-inline f32 v2_len_sq(v2 a)
+static inline f32 v2_len_sq(v2 a)
 {
     return v2_dot(a, a);
 }
 
-inline f32 v2_len(v2 a)
+static inline f32 v2_len(v2 a)
 {
     return ksqrt(v2_len_sq(a));
 }
 
-inline v2 v2_normalize(v2 a)
+static inline v2 v2_normalize(v2 a)
 {
     return v2_div(a, v2_len(a));
 }
 
-inline v2i v2_floor(v2 a)
+static inline v2i v2_floor(v2 a)
 {
     return V2I(kfloor(a.x), kfloor(a.y));
 }
 
-inline v2i v2_ceil(v2 a)
+static inline v2i v2_ceil(v2 a)
 {
     return V2I(kceil(a.x), kceil(a.y));
 }
 
-inline void v2_round2(v2 a, v2 b, v2i *a_result, v2i *b_result)
+static inline void v2_round2(v2 a, v2 b, v2i *a_result, v2i *b_result)
 {
     assert(a_result);
     assert(b_result);
@@ -191,7 +191,7 @@ inline void v2_round2(v2 a, v2 b, v2i *a_result, v2i *b_result)
     b_result->y = (i32)results[3];
 }
 
-inline void v2_floor2(v2 a, v2 b, v2i *a_result, v2i *b_result)
+static inline void v2_floor2(v2 a, v2 b, v2i *a_result, v2i *b_result)
 {
     assert(a_result);
     assert(b_result);
@@ -214,7 +214,7 @@ inline void v2_floor2(v2 a, v2 b, v2i *a_result, v2i *b_result)
     b_result->y = (i32)results[3];
 }
 
-inline void v2_ceil2(v2 a, v2 b, v2i *a_result, v2i *b_result)
+static inline void v2_ceil2(v2 a, v2 b, v2i *a_result, v2i *b_result)
 {
     assert(a_result);
     assert(b_result);
@@ -238,7 +238,7 @@ inline void v2_ceil2(v2 a, v2 b, v2i *a_result, v2i *b_result)
 }
 
 // Converts the specified vector into 1 on each axis preserving the sign.
-inline v2i v2_sign(v2 src)
+static inline v2i v2_sign(v2 src)
 {
     v2i result = {0};
     if (src.x > 0.0f) {
@@ -254,107 +254,107 @@ inline v2i v2_sign(v2 src)
     return result;
 }
 
-inline v2 v2_lerp(v2 v0, v2 v1, f32 t)
+static inline v2 v2_lerp(v2 v0, v2 v1, f32 t)
 {
     return v2_add(v2_mul(v1, t), v2_mul(v0, 1.0f - t));
 }
 
-inline v3 v3_add(v3 a, v3 b)
+static inline v3 v3_add(v3 a, v3 b)
 {
     return V3(a.x + b.x, a.y + b.y, a.z + b.z);
 }
 
-inline v3 v3_sub(v3 a, v3 b)
+static inline v3 v3_sub(v3 a, v3 b)
 {
     return V3(a.x - b.x, a.y - b.y, a.z - b.z);
 }
 
-inline v3 v3_mul(v3 a, f32 scalar)
+static inline v3 v3_mul(v3 a, f32 scalar)
 {
     return V3(a.x * scalar, a.y * scalar, a.z * scalar);
 }
 
-inline v3 v3_div(v3 a, f32 scalar)
+static inline v3 v3_div(v3 a, f32 scalar)
 {
     return V3(a.x / scalar, a.y / scalar, a.z / scalar);
 }
 
-inline f32 v3_dot(v3 a, v3 b)
+static inline f32 v3_dot(v3 a, v3 b)
 {
     return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
 }
 
-inline f32 v3_len_sq(v3 a)
+static inline f32 v3_len_sq(v3 a)
 {
     return v3_dot(a, a);
 }
 
-inline f32 v3_len(v3 a)
+static inline f32 v3_len(v3 a)
 {
     return ksqrt(v3_len_sq(a));
 }
 
-inline v3 v3_normalize(v3 a)
+static inline v3 v3_normalize(v3 a)
 {
     return v3_div(a, v3_len(a));
 }
 
-inline v3 v3_hadamard(v3 a, v3 b)
+static inline v3 v3_hadamard(v3 a, v3 b)
 {
     return V3(a.x * b.x, a.y * b.y, a.z * b.z);
 }
 
-inline v3 v3_clamp(v3 a, f32 min, f32 max)
+static inline v3 v3_clamp(v3 a, f32 min, f32 max)
 {
     return V3(kclampf(a.x, min, max), kclampf(a.y, min, max), kclampf(a.z, min, max));
 }
 
-inline v4 v4_add(v4 a, v4 b)
+static inline v4 v4_add(v4 a, v4 b)
 {
     return V4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
 }
 
-inline v4 v4_sub(v4 a, v4 b)
+static inline v4 v4_sub(v4 a, v4 b)
 {
     return V4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w);
 }
 
-inline v4 v4_mul(v4 a, f32 scalar)
+static inline v4 v4_mul(v4 a, f32 scalar)
 {
     return V4(a.x * scalar, a.y * scalar, a.z * scalar, a.w * scalar);
 }
 
-inline v4 v4_div(v4 a, f32 scalar)
+static inline v4 v4_div(v4 a, f32 scalar)
 {
     return V4(a.x / scalar, a.y / scalar, a.z / scalar, a.w / scalar);
 }
 
-inline v4 v4_lerp(v4 v0, v4 v1, f32 t)
+static inline v4 v4_lerp(v4 v0, v4 v1, f32 t)
 {
     return v4_add(v4_mul(v1, t), v4_mul(v0, 1.0f - t));
 }
 
-inline f32 v4_dot(v4 a, v4 b)
+static inline f32 v4_dot(v4 a, v4 b)
 {
     return (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w);
 }
 
-inline v4 v4_hadamard(v4 a, v4 b)
+static inline v4 v4_hadamard(v4 a, v4 b)
 {
     return V4(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w);
 }
 
-inline f32 v4_len_sq(v4 a)
+static inline f32 v4_len_sq(v4 a)
 {
     return v4_dot(a, a);
 }
 
-inline f32 v4_len(v4 a)
+static inline f32 v4_len(v4 a)
 {
     return ksqrt(v4_len_sq(a));
 }
 
-inline v4 v4_normalize(v4 a)
+static inline v4 v4_normalize(v4 a)
 {
     return v4_div(a, v4_len(a));
 }

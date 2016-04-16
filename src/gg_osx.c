@@ -332,28 +332,108 @@ static void osx_handle_debug_counters(game_memory_t *memory, b8 must_print)
 }
 
 // Queue stuff ===============================
+typedef void (*wq_fn) (void*, u32);
 typedef struct {
-    void (*work_fn) (void*);
+    wq_fn work_fn;
     void *data;
-} work_entry_t;
+} wq_entry_t;
 
-#define RINGBUFFER_SIZE 1024
+#define WQ_SIZE 1024
 typedef struct {
-    work_entry_t work_entries[RINGBUFFER_SIZE];
-    int entry_count;
-} ringbuffer_t;
+    // Try keep start and end off the same cache line
+    // as they will be owned by different threads.
+    volatile u32 start;
+    wq_entry_t entries[WQ_SIZE];
+    volatile u32 end;
+    SDL_sem *semaphore;
+} wq_t;
+
+void wqCreate(wq_t *wq, SDL_sem *semaphore)
+{
+    wq->start = 0;
+    wq->end = 1;
+    wq->semaphore = semaphore;
+}
+
+b8 wqIsEmpty(wq_t *wq)
+{
+    u32 next_index = (wq->start + 1) % WQ_SIZE;
+    u32 end = wq->end % WQ_SIZE;
+    return next_index == end;
+}
+
+b8 wqIsFull(wq_t *wq)
+{
+    return wq->start == wq->end;
+}
+
+b8 wqEnqueue(wq_t *wq, wq_fn work_fn, void *data)
+{
+    u32 start = wq->start;
+    u32 end = wq->end;
+    if (start == end) {
+        // Queue is full.
+        return 0;
+    }
+
+    wq_entry_t *entry = wq->entries + end;
+    entry->work_fn = work_fn;
+    entry->data = data;
+    wq->end = (end + 1) % WQ_SIZE;
+
+    SDL_SemPost(wq->semaphore);
+    return 1;
+}
+
+b8 wqDequeue(wq_t *wq, wq_entry_t *entry)
+{
+    u32 end = wq->end;
+    u32 next_pos = (wq->start + 1) % WQ_SIZE;
+    if (next_pos == end) {
+        // Queue is empty.
+        return 0;
+    }
+
+    wq_entry_t *wq_entry = wq->entries + next_pos;
+    entry->work_fn = wq_entry->work_fn;
+    entry->data = wq_entry->data;
+    wq->start = next_pos;
+    return 1;
+}
+
+void work_function(void *data, u32 thread_id) 
+{
+    char *msg = (char *)data;
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, msg, thread_id);
+}
+
 // ===========================================
 
 // Thread stuff
 // ===========================================
+typedef struct {
+    u32 index;
+    wq_t *work_queue;
+} thread_info_t;
+
 int thread_fn(void *data)
 {
-    // Do some work.
-    char *msg = (char *)data;
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, msg);
-    SDL_Delay(5000);
+    thread_info_t *thread_info = (thread_info_t *)data;
+    wq_t *work_queue = thread_info->work_queue;
+
+    wq_entry_t work_entry;
+    for (;;) {
+        if (wqIsEmpty(work_queue)) {
+            SDL_SemWait(work_queue->semaphore);
+        }
+        else {
+            wqDequeue(work_queue, &work_entry);
+            work_entry.work_fn(work_entry.data, thread_info->index);
+        }
+    }
     return 1;
 }
+// TODO Read the core count to set the thread count.
 #define WORKER_THREAD_COUNT 4
 // ===========================================
 
@@ -363,14 +443,31 @@ int main(void)
         // TODO(Wes): SDL_Init didn't work!
     }
 
+    SDL_sem *semaphore = SDL_CreateSemaphore(0);
+    wq_t work_queue;
+    wqCreate(&work_queue, semaphore);
+    thread_info_t thread_infos[WORKER_THREAD_COUNT];
+
     SDL_Thread* threads[WORKER_THREAD_COUNT];
     for (u32 i = 0; i < WORKER_THREAD_COUNT; i++) {
-        char *msg = "Hello thread!";
-        threads[i] = SDL_CreateThread(thread_fn, "Worker", (void *)msg);
+        thread_info_t *thread_info = thread_infos + i;
+        thread_info->index = i;
+        thread_info->work_queue = &work_queue;
+        threads[i] = SDL_CreateThread(thread_fn, "Worker", (void *)thread_info);
     }
 
-    int threadReturnValue;
+    wqEnqueue(&work_queue, work_function, "%d, String 1");
+    wqEnqueue(&work_queue, work_function, "%d, String 2");
+    wqEnqueue(&work_queue, work_function, "%d, String 3");
+    wqEnqueue(&work_queue, work_function, "%d, String 4");
+    wqEnqueue(&work_queue, work_function, "%d, String 5");
+    wqEnqueue(&work_queue, work_function, "%d, String 6");
+    wqEnqueue(&work_queue, work_function, "%d, String 7");
 
+    SDL_Delay(5000);
+    return 1;
+
+    int threadReturnValue;
     for (u32 i = 0; i < WORKER_THREAD_COUNT; i++) {
         SDL_WaitThread(threads[i], &threadReturnValue);
     }

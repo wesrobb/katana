@@ -5,23 +5,23 @@
 
 #include "gg_types.h"
 
-inline f32 kabsf(f32 f)
+static inline f32 kabsf(f32 f)
 {
     i32 i = ((*(int *)&f) & 0x7fffffff);
     return (*(float *)&i);
 }
 
-inline f32 kcosf(f32 theta)
+static inline f32 kcosf(f32 theta)
 {
     return cosf(theta);
 }
 
-inline f32 ksinf(f32 theta)
+static inline f32 ksinf(f32 theta)
 {
     return sinf(theta);
 }
 
-inline f32 kclampf(f32 value, f32 min, f32 max)
+static inline f32 kclampf(f32 value, f32 min, f32 max)
 {
     if (value < min) {
         value = min;
@@ -33,7 +33,7 @@ inline f32 kclampf(f32 value, f32 min, f32 max)
     return value;
 }
 
-inline u32 kclamp(u32 value, u32 min, u32 max)
+static inline u32 kclamp(u32 value, u32 min, u32 max)
 {
     if (value < min) {
         value = min;
@@ -45,42 +45,42 @@ inline u32 kclamp(u32 value, u32 min, u32 max)
     return value;
 }
 
-inline f32 klerp(f32 a, f32 b, f32 t)
+static inline f32 klerp(f32 a, f32 b, f32 t)
 {
     return (1.0f - t) * a + t * b;
 }
 
-inline f32 ksqrt(f32 a)
+static inline f32 ksqrt(f32 a)
 {
     return sqrtf(a);
 }
 
-inline f32 kmin(f32 a, f32 b)
+static inline f32 kmin(f32 a, f32 b)
 {
     return a < b ? a : b;
 }
 
-inline f32 kmax(f32 a, f32 b)
+static inline f32 kmax(f32 a, f32 b)
 {
     return a > b ? a : b;
 }
 
-inline f32 ksq(f32 a)
+static inline f32 ksq(f32 a)
 {
     return a * a;
 }
 
-inline i32 kfloor(f32 a)
+static inline i32 kfloor(f32 a)
 {
 	return (i32)floorf(a);
 }
 
-inline i32 kceil(f32 a)
+static inline i32 kceil(f32 a)
 {
 	return (i32)ceilf(a);
 }
 
-inline void round4f(f32 const *in, f32 *out)
+static inline void round4f(f32 const *in, f32 *out)
 {
     assert(is_aligned(in, 16));
     assert(is_aligned(out, 16));
@@ -89,7 +89,7 @@ inline void round4f(f32 const *in, f32 *out)
     _mm_store_ps(out, packed_result);
 }
 
-inline void floor4f(f32 const *in, f32 *out)
+static inline void floor4f(f32 const *in, f32 *out)
 {
     assert(is_aligned(in, 16));
     assert(is_aligned(out, 16));
@@ -98,7 +98,7 @@ inline void floor4f(f32 const *in, f32 *out)
     _mm_store_ps(out, packed_result);
 }
 
-inline void ceil4f(f32 const *in, f32 *out)
+static inline void ceil4f(f32 const *in, f32 *out)
 {
     assert(is_aligned(in, 16));
     assert(is_aligned(out, 16));
