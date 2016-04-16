@@ -4,7 +4,7 @@ RELEASE_FLAGS = -O2 -g
 DEBUG_FLAGS = -O0 -g -ggdb
 DEFINES = -DGG_INTERNAL -DGAME_DLL=gg.so -DGAME_TEMP_DLL=gg_temp.so
 DEFINES_D = -DGG_DEBUG -DGG_INTERNAL -DGAME_DLL=gg_d.so -DGAME_TEMP_DLL=gg_temp_d.so 
-DISABLED_WARNINGS = -Wno-unused-function -Wno-unused-variable -Wno-missing-braces
+DISABLED_WARNINGS = -Wno-unused-function -Wno-unused-variable -Wno-missing-braces -Wno-format-security
 
 BIN_TARGET = gg
 BIN_TARGET_D = gg_d
