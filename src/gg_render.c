@@ -207,9 +207,12 @@ static void render_block(v2 pos, v2 size, v4 color, camera_t *cam, game_frame_bu
 #define m128_access(a, i) ((f32*)&a)[i]
 #define m128_access8(a, i) ((u8*)&a)[i]
 
-static void render_image(render_cmd_block_t *cmd,
-	camera_t *cam,
-	game_frame_buffer_t *frame_buffer)
+typedef struct {
+    v2i min, max;
+} clip_rect_t;
+
+static void render_image(render_cmd_block_t *cmd, camera_t *cam, 
+                         game_frame_buffer_t *frame_buffer, clip_rect_t clip_rect)
 {
 	START_COUNTER(render_rotated_block);
 	basis_t basis = cmd->header.basis;
@@ -256,18 +259,18 @@ static void render_image(render_cmd_block_t *cmd,
 		}
 	}
 
-	// NOTE(Wes): Clip to frame_buffer edges.
-	if (x_min < 0) {
-		x_min = 0;
+	// NOTE(Wes): Clip to clip rect edges.
+	if (x_min < clip_rect.min.x) {
+		x_min = clip_rect.min.x;
 	}
-	if (x_max > max_width) {
-		x_max = max_width;
+	if (x_max > clip_rect.max.x) {
+		x_max = clip_rect.max.x;
 	}
-	if (y_min < 0) {
-		y_min = 0;
+	if (y_min < clip_rect.min.y) {
+		y_min = clip_rect.min.y;
 	}
-	if (y_max < max_height) {
-		y_max = max_height;
+	if (y_max > clip_rect.max.y) {
+		y_max = clip_rect.max.y;
 	}
 
 	f32 inv_x_len_sq = 1.0f / v2_len_sq(x_axis);
@@ -864,7 +867,8 @@ void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer)
 		case render_type_rotated_block:
 		{
 			//render_rotated_block((render_cmd_block_t *)header, queue->camera, frame_buffer);
-			render_image((render_cmd_block_t *)header, queue->camera, frame_buffer);
+            clip_rect_t clip_rect = {V2I(5, 5), V2I(250, 250)};
+			render_image((render_cmd_block_t *)header, queue->camera, frame_buffer, clip_rect);
 			address += sizeof(render_cmd_block_t);
 		}
 		break;

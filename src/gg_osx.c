@@ -464,14 +464,6 @@ int main(void)
     wqEnqueue(&work_queue, work_function, "%d, String 6");
     wqEnqueue(&work_queue, work_function, "%d, String 7");
 
-    SDL_Delay(5000);
-    return 1;
-
-    int threadReturnValue;
-    for (u32 i = 0; i < WORKER_THREAD_COUNT; i++) {
-        SDL_WaitThread(threads[i], &threadReturnValue);
-    }
-
     i32 window_width = 960;
     i32 window_height = 540;
     i32 windoy_pos_x = 0;
