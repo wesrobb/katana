@@ -562,13 +562,13 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
     v2 background_pos = V2(0.0f, 0.0f);
     v2 background_size = V2(128.0f, 72.0f);
     basis_t background_basis = {background_pos, V2(background_size.x, 0.0f), V2(0.0f, background_size.y)};
-    render_push_rotated_block(game_state->render_queue,
-                              &background_basis,
-                              V4(1.0f, 1.0f, 1.0f, 1.0f),
-                              &game_state->background_image,
-                              0,
-                              &light,
-                              1);
+   // render_push_rotated_block(game_state->render_queue,
+   //                           &background_basis,
+   //                           V4(1.0f, 1.0f, 1.0f, 1.0f),
+   //                           &game_state->background_image,
+   //                           0,
+   //                           &light,
+   //                           1);
     for (u32 i = 0; i < 18; ++i) {
         for (u32 j = 0; j < 32; ++j) {
             if (tilemap->tiles[j + i * tilemap->tiles_wide]) {
