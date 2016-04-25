@@ -28,7 +28,8 @@ typedef void (*game_update_and_render_fn_t)(game_memory_t *,
                                             game_audio_t *,
                                             game_input_t *,
                                             game_output_t *,
-                                            game_callbacks_t *);
+                                            game_callbacks_t *,
+                                            game_work_queues_t *);
 
 typedef struct {
     char *so;
@@ -332,14 +333,13 @@ static void osx_handle_debug_counters(game_memory_t *memory, b8 must_print)
 }
 
 // Queue stuff ===============================
-typedef void (*wq_fn) (void*, u32);
 typedef struct {
     wq_fn work_fn;
     void *data;
 } wq_entry_t;
 
 #define WQ_SIZE 1024
-typedef struct {
+typedef struct wq_t {
     // Try keep start and end off the same cache line
     // as they will be owned by different threads.
     volatile u32 start;
@@ -401,10 +401,13 @@ b8 wqDequeue(wq_t *wq, wq_entry_t *entry)
     return 1;
 }
 
-void work_function(void *data, u32 thread_id) 
+void wqFinishWork(wq_t *wq)
 {
-    char *msg = (char *)data;
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, msg, thread_id);
+    wq_entry_t work_entry;
+    while (!wqIsEmpty(wq)) {
+        wqDequeue(wq, &work_entry);
+        work_entry.work_fn(work_entry.data);
+    }
 }
 
 // ===========================================
@@ -428,7 +431,7 @@ int thread_fn(void *data)
         }
         else {
             wqDequeue(work_queue, &work_entry);
-            work_entry.work_fn(work_entry.data, thread_info->index);
+            work_entry.work_fn(work_entry.data);
         }
     }
     return 1;
@@ -444,25 +447,22 @@ int main(void)
     }
 
     SDL_sem *semaphore = SDL_CreateSemaphore(0);
-    wq_t work_queue;
-    wqCreate(&work_queue, semaphore);
+    wq_t render_work_queue;
+    wqCreate(&render_work_queue, semaphore);
     thread_info_t thread_infos[WORKER_THREAD_COUNT];
 
     SDL_Thread* threads[WORKER_THREAD_COUNT];
     for (u32 i = 0; i < WORKER_THREAD_COUNT; i++) {
         thread_info_t *thread_info = thread_infos + i;
         thread_info->index = i;
-        thread_info->work_queue = &work_queue;
+        thread_info->work_queue = &render_work_queue;
         threads[i] = SDL_CreateThread(thread_fn, "Worker", (void *)thread_info);
     }
-
-    wqEnqueue(&work_queue, work_function, "%d, String 1");
-    wqEnqueue(&work_queue, work_function, "%d, String 2");
-    wqEnqueue(&work_queue, work_function, "%d, String 3");
-    wqEnqueue(&work_queue, work_function, "%d, String 4");
-    wqEnqueue(&work_queue, work_function, "%d, String 5");
-    wqEnqueue(&work_queue, work_function, "%d, String 6");
-    wqEnqueue(&work_queue, work_function, "%d, String 7");
+    
+    game_work_queues_t game_work_queues;
+    game_work_queues.render_work_queue = &render_work_queue;
+    game_work_queues.add_work = wqEnqueue;
+    game_work_queues.finish_work = wqFinishWork;
 
     i32 window_width = 960;
     i32 window_height = 540;
@@ -642,7 +642,8 @@ int main(void)
         // NOTE(Wes): The frame buffer pixels point directly to the SDL texture.
         SDL_LockTexture(texture, 0, (void **)&frame_buffer.data, (i32 *)&frame_buffer.pitch);
 
-        game.update_and_render_fn(&game_memory, &frame_buffer, &audio, new_input, &output, &callbacks);
+        game.update_and_render_fn(&game_memory, &frame_buffer, &audio, new_input,
+                                  &output, &callbacks, &game_work_queues);
         SDL_UnlockTexture(texture);
 
         SDL_RenderCopy(renderer, texture, 0, 0);

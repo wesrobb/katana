@@ -3,7 +3,6 @@
 #include "gg_vec.h"
 
 // Converts a normalized color into a texture specific pixel value.
-// Note that this should not be used for writing values into the
 // framebuffer as the order of the bytes differs.
 u32 color_image_32(v4 color);
 
@@ -36,4 +35,4 @@ void render_push_line(render_queue_t *queue, basis_t *basis, v2 start, v2 end, f
 render_queue_t *render_alloc_queue(memory_arena_t *arena, u32 max_render_queue_size, camera_t *cam);
 
 // Performs drawing on all render commands in the queue.
-void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer);
+void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer, game_work_queues_t *work_queues);

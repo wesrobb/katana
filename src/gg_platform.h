@@ -201,12 +201,25 @@ typedef void(*log_fn)(const char*, ...);
 typedef struct {
     load_file_fn load_file;
     unload_file_fn unload_file;
-	log_fn log;
+    log_fn log;
 } game_callbacks_t;
+
+// Worker Queue
+typedef struct wq_t wq_t;
+typedef void (*wq_fn) (void *);
+typedef b8 (*add_work_fn)(wq_t *, wq_fn, void *);
+typedef void (*finish_work_fn)(wq_t *);
+typedef struct {
+    wq_t *render_work_queue;
+    add_work_fn add_work;
+    finish_work_fn finish_work;
+} game_work_queues_t;
+
 
 DLL_FN void game_update_and_render(game_memory_t *memory,
                                    game_frame_buffer_t *frame_buffer,
                                    game_audio_t *audio,
                                    game_input_t *input,
                                    game_output_t *output,
-                                   game_callbacks_t *callbacks);
+                                   game_callbacks_t *callbacks,
+                                   game_work_queues_t *work_queues);

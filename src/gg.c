@@ -398,11 +398,12 @@ static image_t load_image(const char *path, load_file_fn load_file)
 
 game_memory_t *dbg_global_memory;
 DLL_FN void game_update_and_render(game_memory_t *memory,
-                            game_frame_buffer_t *frame_buffer,
-                            game_audio_t *audio,
-                            game_input_t *input,
-                            game_output_t *output,
-                            game_callbacks_t *callbacks)
+                                   game_frame_buffer_t *frame_buffer,
+                                   game_audio_t *audio,
+                                   game_input_t *input,
+                                   game_output_t *output,
+                                   game_callbacks_t *callbacks,
+                                   game_work_queues_t *work_queues)
 {
     dbg_global_memory = memory;
     START_COUNTER(game_update_and_render);
@@ -631,7 +632,7 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
     render_push_line(game_state->render_queue, &line1_basis, V2(0, 0), V2(0, 0), 5.0f, line_color1);
     render_push_line(game_state->render_queue, &line2_basis, V2(0, 0), V2(0, 0), 5.0f, line_color2);
 #endif
-    render_draw_queue(game_state->render_queue, frame_buffer);
+    render_draw_queue(game_state->render_queue, frame_buffer, work_queues);
 
     output_sine_wave(game_state, audio);
 

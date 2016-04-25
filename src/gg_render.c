@@ -841,7 +841,20 @@ render_queue_t *render_alloc_queue(memory_arena_t *arena, u32 max_render_queue_s
     return queue;
 }
 
-void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer)
+typedef struct {
+    render_cmd_block_t *cmd;
+    camera_t *camera;
+    game_frame_buffer_t *frame_buffer;
+    clip_rect_t clip_rect;
+} render_work_t;
+
+void render_worker(void *data)
+{
+    render_work_t *work = (render_work_t *)data;
+    render_image(work->cmd, work->camera, work->frame_buffer, work->clip_rect);
+}
+
+void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer, game_work_queues_t *work_queues)
 {
     START_COUNTER(render_draw_queue);
     for (u32 address = 0; address < queue->index;) {
@@ -859,8 +872,10 @@ void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer)
         case render_type_rotated_block: {
             // render_rotated_block((render_cmd_block_t *)header, queue->camera, frame_buffer);
 
-            u32 const tile_y_count = 10;
-            u32 const tile_x_count = 10;
+            u32 const tile_y_count = 4;
+            u32 const tile_x_count = 4;
+            render_work_t work_infos[tile_y_count * tile_x_count];
+            u32 work_index = 0;
             u32 height = frame_buffer->h;
             u32 width = frame_buffer->w;
             u32 tile_height = height / tile_y_count;
@@ -871,10 +886,17 @@ void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer)
                     u32 min_x = x * tile_width;
                     u32 max_y = min_y + tile_height - 1;
                     u32 max_x = min_x + tile_width - 1;
-                    clip_rect_t clip_rect = {V2I(min_x, min_y), V2I(max_x, max_y)};
-                    render_image((render_cmd_block_t *)header, queue->camera, frame_buffer, clip_rect);
+
+                    render_work_t *work = work_infos + work_index++;
+                    work->cmd = (render_cmd_block_t *)header;
+                    work->camera = queue->camera;
+                    work->frame_buffer = frame_buffer;
+                    work->clip_rect = (clip_rect_t){V2I(min_x, min_y), V2I(max_x, max_y)};
+                    work_queues->add_work(work_queues->render_work_queue, render_worker, work);
                 }
             }
+
+            work_queues->finish_work(work_queues->render_work_queue);
 
            // clip_rect_t clip_rect = {V2I(5, 5), V2I(250, 250)};
            // render_image((render_cmd_block_t *)header, queue->camera, frame_buffer, clip_rect);
