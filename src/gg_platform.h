@@ -114,11 +114,12 @@ typedef struct {
 extern game_memory_t *dbg_global_memory;
 #endif
 
+#define GG_BYTES_PP 4 // Bytes per pixel
 typedef struct {
-    u32 *data; // Always 4bpp. RR GG BB AA
+    u8 *data; // Always 4bpp. RR GG BB AA
     u32 w;
     u32 h;
-    u32 pitch;
+    u32 pitch; // In number of bytes
 } game_frame_buffer_t;
 
 typedef struct {

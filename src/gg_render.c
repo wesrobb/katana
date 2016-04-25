@@ -129,7 +129,7 @@ static inline void linear_blend_texel(u32 texel, u32 *dest)
 static void render_clear(render_cmd_clear_t *cmd, game_frame_buffer_t *frame_buffer)
 {
     for (u32 y = 0; y < frame_buffer->h; ++y) {
-        u32 *pixels = frame_buffer->data + y * frame_buffer->pitch;
+        u32 *pixels = (u32 *)(frame_buffer->data + y * frame_buffer->pitch);
         for (u32 x = 0; x < frame_buffer->w; ++x) {
             pixels[x] = (u8)(cmd->color.r * 255.0f + 0.5f) << 24 | (u8)(cmd->color.g * 255.0f + 0.5f) << 16 |
                         (u8)(cmd->color.b * 255.0f + 0.5f) << 8 | (u8)(cmd->color.a * 255.0f + 0.5f) << 0;
@@ -184,7 +184,7 @@ static void render_block(v2 pos, v2 size, v4 color, camera_t *cam, game_frame_bu
     }
 
     for (i32 i = top_left_pixel.y; i < bot_right_pixel.y; ++i) {
-        u32 *pixels = frame_buffer->data + i * frame_buffer->pitch;
+        u32 *pixels = (u32 *)(frame_buffer->data + i * frame_buffer->pitch);
         for (i32 j = top_left_pixel.x; j < bot_right_pixel.x; ++j) {
             pixels[j] = (u8)(color.r * 255.0f + 0.5f) << 24 | (u8)(color.g * 255.0f + 0.5f) << 16 |
                         (u8)(color.b * 255.0f + 0.5f) << 8 | (u8)(color.a * 255.0f + 0.5f) << 0;
@@ -301,7 +301,7 @@ render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
     __m128i third_mask = _mm_setr_epi32(0, 0, 0xFFFFFFFF, 0);
     __m128i fourth_mask = _mm_setr_epi32(0, 0, 0, 0xFFFFFFFF);
 
-    u32 *fb_data = frame_buffer->data;
+    u8 *fb_data = frame_buffer->data;
     START_COUNTER(process_pixel);
     for (i32 y = y_min; y <= y_max; y++) {
         for (i32 x = x_min; x <= x_max; x += 4) {
@@ -429,7 +429,7 @@ render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
             __m128 blended_a4 = _mm_add_ps(_mm_add_ps(_mm_mul_ps(texel_d_a4, c0), _mm_mul_ps(texel_c_a4, c1)),
                                            _mm_add_ps(_mm_mul_ps(texel_b_a4, c2), _mm_mul_ps(texel_a_a4, c3)));
 
-            __m128i *fb_pixel = (__m128i *)&fb_data[x + y * frame_buffer->w];
+            __m128i *fb_pixel = (__m128i *)&fb_data[(x * GG_BYTES_PP) + y * frame_buffer->pitch];
             // TODO(Wes): Align our framebuffer on the 16 byte boundary
             __m128i fb_pixel4 = _mm_loadu_si128(fb_pixel);
 
@@ -577,7 +577,7 @@ static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_fr
     image_t *normals = cmd->normals;
     v4 tint = cmd->tint;
 
-    u32 *fb_data = frame_buffer->data;
+    u8 *fb_data = frame_buffer->data;
     START_COUNTER(process_pixel);
     for (i32 y = y_min; y <= y_max; y++) {
         for (i32 x = x_min; x <= x_max; x += 4) {
@@ -669,7 +669,7 @@ static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_fr
 					}
 #endif
 
-                    u32 *fb_pixel = &fb_data[x + i + y * frame_buffer->w];
+                    u32 *fb_pixel = (u32 *)&fb_data[x + (i * GG_BYTES_PP) + y * frame_buffer->pitch];
                     v4 dest_color = read_frame_buffer_color(*fb_pixel);
 
                     dest_color = srgb_to_linear(dest_color);
@@ -746,7 +746,7 @@ static void render_line(render_cmd_line_t *cmd, camera_t *cam, game_frame_buffer
     }
 
     v4 color = cmd->color;
-    u32 *fb_data = frame_buffer->data;
+    u8 *fb_data = frame_buffer->data;
     for (i32 y = y_min; y <= y_max; y++) {
         for (i32 x = x_min; x <= x_max; x++) {
             // NOTE(Wes): Take the dot product of the point and the axis
@@ -763,7 +763,7 @@ static void render_line(render_cmd_line_t *cmd, camera_t *cam, game_frame_buffer
             p = v2_add(p, x_axis);
             f32 edge4 = v2_dot(p, v2_neg(x_axis));
             if (edge1 < 0 && edge2 < 0 && edge3 < 0 && edge4 < 0) {
-                u32 *fb_pixel = &fb_data[x + y * frame_buffer->w];
+                u32 *fb_pixel = (u32 *)&fb_data[(x * GG_BYTES_PP) + y * frame_buffer->pitch];
                 v4 dest_color = read_frame_buffer_color(*fb_pixel);
                 dest_color = srgb_to_linear(dest_color);
                 dest_color = linear_blend(color, dest_color);

@@ -641,8 +641,6 @@ int main(void)
 
         // NOTE(Wes): The frame buffer pixels point directly to the SDL texture.
         SDL_LockTexture(texture, 0, (void **)&frame_buffer.data, (i32 *)&frame_buffer.pitch);
-        // NOTE(Wes): Set the pitch to num pixels.
-        frame_buffer.pitch /= sizeof(u32);
 
         game.update_and_render_fn(&game_memory, &frame_buffer, &audio, new_input, &output, &callbacks);
         SDL_UnlockTexture(texture);
