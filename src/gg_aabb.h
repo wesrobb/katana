@@ -28,6 +28,11 @@ static inline aabb2i_t aabb2i_union(aabb2i_t a, aabb2i_t b)
     return result;
 }
 
+static inline b8 aabb2i_has_area(aabb2i_t a)
+{
+    return (a.x_min < a.x_max) && (a.y_min < a.y_max);
+}
+
 static inline i32 aabb2i_clamped_area(aabb2i_t a)
 {
     i32 width = a.x_max - a.x_min;

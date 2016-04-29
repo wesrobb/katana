@@ -252,8 +252,30 @@ render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
         }
     }
 
+    if (!aabb2i_has_area(fill_rect)) {
+        return;
+    }
+
     // NOTE(Wes): Clip to clip rect edges.
     fill_rect = aab2i_intersect(fill_rect, clip_rect);
+
+    // Align the 4px write to x_max and write mask overwrite on x_min boundary.
+    __m128i clip_mask;
+    clip_mask = _mm_set1_epi32(0xFFFFFFFF);
+    __m128i clip_mask_table[3];
+    clip_mask_table[0] = _mm_setr_epi32(0, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF);
+    clip_mask_table[1] = _mm_setr_epi32(0, 0, 0xFFFFFFFF, 0xFFFFFFFF);
+    clip_mask_table[2] = _mm_setr_epi32(0, 0, 0, 0xFFFFFFFF);
+    u32 fill_width = fill_rect.x_max - fill_rect.x_min;
+    u32 fill_width_align = fill_width & 3;
+    if (fill_width_align > 0) {
+        const i32 adjustment = 4 - fill_width_align;
+        fill_width += adjustment;
+        fill_rect.x_min = fill_rect.x_max - fill_width;
+
+        clip_mask = clip_mask_table[adjustment - 1];
+    }
+
 
     f32 inv_x_len_sq = 1.0f / v2_len_sq(x_axis);
     f32 inv_y_len_sq = 1.0f / v2_len_sq(y_axis);
@@ -288,13 +310,15 @@ render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
     __m128i third_mask = _mm_setr_epi32(0, 0, 0xFFFFFFFF, 0);
     __m128i fourth_mask = _mm_setr_epi32(0, 0, 0, 0xFFFFFFFF);
 
+
     u8 *fb_data = frame_buffer->data;
     START_COUNTER(process_pixel);
     for (i32 y = fill_rect.y_min; y < fill_rect.y_max; y++) {
+        __m128 p_orig_y4 = _mm_set1_ps(y - origin.y);
+
         for (i32 x = fill_rect.x_min; x < fill_rect.x_max; x += 4) {
             // Calculate pixel origin
             __m128 p_orig_x4 = _mm_setr_ps(x - origin.x, x - origin.x + 1, x - origin.x + 2, x - origin.x + 3);
-            __m128 p_orig_y4 = _mm_set1_ps(y - origin.y);
 
             // Calculate texture coord
             __m128 u4 = _mm_add_ps(_mm_mul_ps(p_orig_x4, n_x_axis_x4), _mm_mul_ps(p_orig_y4, n_x_axis_y4));
@@ -308,11 +332,13 @@ render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
             __m128i write_mask =
                 _mm_castps_si128(_mm_and_ps(_mm_and_ps(u4_ge_zero, u4_le_one), _mm_and_ps(v4_ge_zero, v4_le_one)));
 
-            // NOTE(Wes): Not a fan of this scalar branch but who can argue with ~50% performance boost.
+            write_mask = _mm_and_si128(write_mask, clip_mask);
+#if 0
             if (m128i_access(write_mask, 0) == 0 && m128i_access(write_mask, 1) == 0 &&
                 m128i_access(write_mask, 2) == 0 && m128i_access(write_mask, 3) == 0) {
                 continue;
             }
+#endif
 
             // Clamp texture coord
             u4 = _mm_max_ps(_mm_min_ps(u4, one4), zero4);
@@ -474,6 +500,7 @@ render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
             __m128i out = _mm_or_si128(_mm_or_si128(fb_pixel_0, fb_pixel_1), _mm_or_si128(fb_pixel_2, fb_pixel_3));
 
             __m128i masked_out = _mm_or_si128(_mm_and_si128(write_mask, out), _mm_andnot_si128(write_mask, fb_pixel4));
+            clip_mask = _mm_set1_epi32(0xFFFFFFFF);
 
 #ifdef GG_DEBUG
             pixel_t pixels[4];
@@ -875,9 +902,14 @@ void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer,
                     u32 max_y = min_y + tile_height;
                     u32 max_x = min_x + tile_width;
 
-                    min_x = 0;
+                    static u32 slider = 0;
+                    static u32 counter = 0;
+                    if (counter++ % 3000 == 0)
+                    slider++;
+                    slider %= 800;
+                    min_x = 0 + slider;
                     min_y = 0;
-                    max_x = 500;
+                    max_x = 500 + slider;
                     max_y = 700;
 
                     render_work_t *work = work_infos + work_index++;
