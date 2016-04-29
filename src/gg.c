@@ -1,6 +1,7 @@
 #include "gg_types.h"
 #include "gg_math.h"
 #include "gg_vec.h"
+#include "gg_aabb.h"
 #include "gg_render.h"
 #include "gg_collider.h"
 

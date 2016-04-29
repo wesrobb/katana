@@ -403,10 +403,20 @@ b8 wqDequeue(wq_t *wq, wq_entry_t *entry)
 
 void wqFinishWork(wq_t *wq)
 {
-    wq_entry_t work_entry;
-    while (!wqIsEmpty(wq)) {
-        wqDequeue(wq, &work_entry);
-        work_entry.work_fn(work_entry.data);
+    for (;;) {
+        u32 end = wq->end;
+        u32 next_pos = (wq->start + 1) % WQ_SIZE;
+        if (next_pos == end) {
+            // Queue is empty.
+            return;
+        }
+
+        wq_entry_t entry;
+        wq_entry_t *wq_entry = wq->entries + next_pos;
+        entry.work_fn = wq_entry->work_fn;
+        entry.data = wq_entry->data;
+        wq->start = next_pos;
+        entry.work_fn(entry.data);
     }
 }
 

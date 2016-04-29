@@ -27,8 +27,8 @@
 #define is_aligned(POINTER, BYTE_COUNT)                                        \
     (((uintptr_t)(const void *)(POINTER)) % (BYTE_COUNT) == 0)
 
-#define gg_min(a, b) a < b ? a : b
-#define gg_max(a, b) a > b ? a : b
+#define gg_min(a, b) (a) < (b) ? (a) : (b)
+#define gg_max(a, b) (a) > (b) ? (a) : (b)
 
 #define ARRAY_LEN(array) (sizeof((array))/sizeof((array)[0]))
 
