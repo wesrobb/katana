@@ -260,8 +260,7 @@ render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
     fill_rect = aab2i_intersect(fill_rect, clip_rect);
 
     // Align the 4px write to x_max and write mask overwrite on x_min boundary.
-    __m128i clip_mask;
-    clip_mask = _mm_set1_epi32(0xFFFFFFFF);
+    __m128i start_clip_mask = _mm_set1_epi32(0xFFFFFFFF);
     __m128i clip_mask_table[3];
     clip_mask_table[0] = _mm_setr_epi32(0, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF);
     clip_mask_table[1] = _mm_setr_epi32(0, 0, 0xFFFFFFFF, 0xFFFFFFFF);
@@ -273,7 +272,7 @@ render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
         fill_width += adjustment;
         fill_rect.x_min = fill_rect.x_max - fill_width;
 
-        clip_mask = clip_mask_table[adjustment - 1];
+        start_clip_mask = clip_mask_table[adjustment - 1];
     }
 
 
@@ -310,11 +309,11 @@ render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
     __m128i third_mask = _mm_setr_epi32(0, 0, 0xFFFFFFFF, 0);
     __m128i fourth_mask = _mm_setr_epi32(0, 0, 0, 0xFFFFFFFF);
 
-
     u8 *fb_data = frame_buffer->data;
     START_COUNTER(process_pixel);
     for (i32 y = fill_rect.y_min; y < fill_rect.y_max; y++) {
         __m128 p_orig_y4 = _mm_set1_ps(y - origin.y);
+        __m128i clip_mask = start_clip_mask;
 
         for (i32 x = fill_rect.x_min; x < fill_rect.x_max; x += 4) {
             // Calculate pixel origin
@@ -444,13 +443,13 @@ render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
 
             __m128i *fb_pixel = (__m128i *)&fb_data[(x * GG_BYTES_PP) + y * frame_buffer->pitch];
             // TODO(Wes): Align our framebuffer on the 16 byte boundary
-            __m128i fb_pixel4 = _mm_loadu_si128(fb_pixel);
+            __m128i fb_pixel_packed = _mm_loadu_si128(fb_pixel);
 
             // Convert current value in framebuffer to rrrr, gggg, bbbb, aaaa
-            __m128i fb_pixel_a4i = _mm_and_si128(texel_mask, fb_pixel4);
-            __m128i fb_pixel_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel4, 8));
-            __m128i fb_pixel_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel4, 16));
-            __m128i fb_pixel_r4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel4, 24));
+            __m128i fb_pixel_a4i = _mm_and_si128(texel_mask, fb_pixel_packed);
+            __m128i fb_pixel_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel_packed, 8));
+            __m128i fb_pixel_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel_packed, 16));
+            __m128i fb_pixel_r4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel_packed, 24));
 
             // Convert packed frame buffer values from u8 (0-255) to f32 (0.0f-1.0f)
             __m128 fb_pixel_a4 = _mm_mul_ps(_mm_cvtepi32_ps(fb_pixel_a4i), inv_255);
@@ -499,7 +498,8 @@ render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
 
             __m128i out = _mm_or_si128(_mm_or_si128(fb_pixel_0, fb_pixel_1), _mm_or_si128(fb_pixel_2, fb_pixel_3));
 
-            __m128i masked_out = _mm_or_si128(_mm_and_si128(write_mask, out), _mm_andnot_si128(write_mask, fb_pixel4));
+            __m128i masked_out = _mm_or_si128(_mm_and_si128(write_mask, out),
+                                              _mm_andnot_si128(write_mask, fb_pixel_packed));
             clip_mask = _mm_set1_epi32(0xFFFFFFFF);
 
 #ifdef GG_DEBUG
@@ -901,16 +901,6 @@ void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer,
                     u32 min_x = x * tile_width;
                     u32 max_y = min_y + tile_height;
                     u32 max_x = min_x + tile_width;
-
-                    static u32 slider = 0;
-                    static u32 counter = 0;
-                    if (counter++ % 3000 == 0)
-                    slider++;
-                    slider %= 800;
-                    min_x = 0 + slider;
-                    min_y = 0;
-                    max_x = 500 + slider;
-                    max_y = 700;
 
                     render_work_t *work = work_infos + work_index++;
                     work->cmd = (render_cmd_block_t *)header;

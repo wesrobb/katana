@@ -447,7 +447,7 @@ int thread_fn(void *data)
     return 1;
 }
 // TODO Read the core count to set the thread count.
-#define WORKER_THREAD_COUNT 1
+#define WORKER_THREAD_COUNT 4
 // ===========================================
 
 int main(void)
@@ -466,7 +466,7 @@ int main(void)
         thread_info_t *thread_info = thread_infos + i;
         thread_info->index = i;
         thread_info->work_queue = &render_work_queue;
-        threads[i] = SDL_CreateThread(thread_fn, "Worker", (void *)thread_info);
+        threads[i] = SDL_CreateThread(thread_fn, "gg_worker", (void *)thread_info);
     }
 
     game_work_queues_t game_work_queues;
