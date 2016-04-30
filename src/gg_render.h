@@ -18,18 +18,16 @@ v4 linear_to_srgb(v4 color);
 // Clears the screen to the specified color.
 void render_push_clear(render_queue_t *queue, v4 color);
 
-void render_push_block(render_queue_t *queue, v2 pos, v2 size, v4 tint);
-
 // Renders the specified image.
-void render_push_rotated_block(render_queue_t *queue,
-                               basis_t *basis,
-                               v4 tint,
-                               image_t *image,
-                               image_t *normals,
-                               light_t *lights,
-                               int num_lights);
+void render_push_image(render_queue_t *queue,
+                       basis_t *basis,
+                       v4 tint,
+                       image_t *image,
+                       image_t *normals,
+                       light_t *lights,
+                       int num_lights);
 
-void render_push_line(render_queue_t *queue, basis_t *basis, v2 start, v2 end, f32 width, v4 color);
+void render_push_rect(render_queue_t *queue, basis_t *basis, v2 start, v2 end, f32 width, v4 color);
 
 // Allocates a render queue.
 render_queue_t *render_alloc_queue(memory_arena_t *arena, u32 max_render_queue_size, camera_t *cam);

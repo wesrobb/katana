@@ -8,7 +8,7 @@ typedef struct {
 
 #define AABB2I(x_min, y_min, x_max, y_max) (aabb2i_t){(i32)x_min, (i32)y_min, (i32)x_max, (i32)y_max}
 
-static inline aabb2i_t aab2i_intersect(aabb2i_t a, aabb2i_t b)
+static inline aabb2i_t aabb2i_intersect(aabb2i_t a, aabb2i_t b)
 {
     aabb2i_t result;
     result.x_min = gg_max(a.x_min, b.x_min);
@@ -42,4 +42,9 @@ static inline i32 aabb2i_clamped_area(aabb2i_t a)
         result = width * height;
     }
     return result;
+}
+
+static inline aabb2i_t aabb2i_inverted_infinity()
+{
+    return AABB2I(INT_MAX, INT_MAX, -INT_MAX, -INT_MAX);
 }

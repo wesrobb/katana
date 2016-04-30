@@ -318,10 +318,12 @@ static void osx_handle_debug_counters(game_memory_t *memory, b8 must_print)
     for (u32 i = 0; i < ARRAY_LEN(memory->counters); ++i) {
         dbg_counter_t *counter = &memory->counters[i];
         if (must_print) {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tcy %"PRIu64", h %u, cy/h %"PRIu64, 
-                        counter->cycles, 
-                        counter->hits,
-                        counter->cycles / counter->hits);
+            if (counter->hits != 0) {
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "\tcy %"PRIu64", h %u, cy/h %"PRIu64, 
+                            counter->cycles,
+                            counter->hits,
+                            counter->cycles / counter->hits);
+            }
         }
         if (counter->hits)
         {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <limits.h>
 
 #ifdef _MSC_VER
 #ifdef GG_DLL

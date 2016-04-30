@@ -5,7 +5,11 @@
 
 #include "xmmintrin.h"
 
-typedef enum { render_type_clear, render_type_block, render_type_rotated_block, render_type_line } render_type_t;
+typedef enum {
+    render_type_clear,
+    render_type_image,
+    render_type_rect
+} render_type_t;
 
 typedef struct {
     render_type_t type;
@@ -27,7 +31,7 @@ typedef struct {
     image_t *normals;
     light_t *lights;
     u32 num_lights;
-} render_cmd_block_t;
+} render_cmd_image_t;
 
 typedef struct {
     render_cmd_header_t header;
@@ -35,7 +39,7 @@ typedef struct {
     v2 end;
     f32 width;
     v4 color;
-} render_cmd_line_t;
+} render_cmd_rect_t;
 
 static inline v4 read_frame_buffer_color(u32 buffer)
 {
@@ -127,18 +131,18 @@ static inline void linear_blend_texel(u32 texel, u32 *dest)
     *dest = temp;
 }
 
-static void render_clear(render_cmd_clear_t *cmd, game_frame_buffer_t *frame_buffer)
+static void render_clear(render_cmd_clear_t *cmd, game_frame_buffer_t *frame_buffer, aabb2i_t clip_rect)
 {
-    for (u32 y = 0; y < frame_buffer->h; ++y) {
+    for (i32 y = clip_rect.y_min; y < clip_rect.y_max; ++y) {
         u32 *pixels = (u32 *)(frame_buffer->data + y * frame_buffer->pitch);
-        for (u32 x = 0; x < frame_buffer->w; ++x) {
+        for (i32 x = clip_rect.x_min; x < clip_rect.x_max; ++x) {
             pixels[x] = (u8)(cmd->color.r * 255.0f + 0.5f) << 24 | (u8)(cmd->color.g * 255.0f + 0.5f) << 16 |
                         (u8)(cmd->color.b * 255.0f + 0.5f) << 8 | (u8)(cmd->color.a * 255.0f + 0.5f) << 0;
         }
     }
 }
 
-static void render_block(v2 pos, v2 size, v4 color, camera_t *cam, game_frame_buffer_t *frame_buffer)
+static void render_block(v2 pos, v2 size, v4 color, camera_t *cam, game_frame_buffer_t *frame_buffer, aabb2i_t clip_rect)
 {
     f32 units_to_pixels = cam->units_to_pixels;
     f32 frame_width_units = frame_buffer->w / units_to_pixels;
@@ -162,31 +166,12 @@ static void render_block(v2 pos, v2 size, v4 color, camera_t *cam, game_frame_bu
     v2i bot_right_pixel;
     v2_floor2(top_left_corner, bot_right_corner, &top_left_pixel, &bot_right_pixel);
 
-    // Bounds checking
-    if (top_left_pixel.x < 0) {
-        top_left_pixel.x = 0;
-    } else if (top_left_pixel.x > (i32)frame_buffer->w) {
-        top_left_pixel.x = frame_buffer->w;
-    }
-    if (top_left_pixel.y < 0) {
-        top_left_pixel.y = 0;
-    } else if (top_left_pixel.y > (i32)frame_buffer->h) {
-        top_left_pixel.y = frame_buffer->h;
-    }
-    if (bot_right_pixel.x < 0) {
-        bot_right_pixel.x = 0;
-    } else if (bot_right_pixel.x > (i32)frame_buffer->w) {
-        bot_right_pixel.x = frame_buffer->w;
-    }
-    if (bot_right_pixel.y < 0) {
-        bot_right_pixel.y = 0;
-    } else if (bot_right_pixel.y > (i32)frame_buffer->h) {
-        bot_right_pixel.y = frame_buffer->h;
-    }
+    aabb2i_t fill_rect = AABB2I(top_left_pixel.x, top_left_pixel.y, bot_right_pixel.x, bot_right_pixel.y);
+    fill_rect = aabb2i_intersect(fill_rect, clip_rect);
 
-    for (i32 i = top_left_pixel.y; i < bot_right_pixel.y; ++i) {
+    for (i32 i = fill_rect.y_min; i < fill_rect.y_max; ++i) {
         u32 *pixels = (u32 *)(frame_buffer->data + i * frame_buffer->pitch);
-        for (i32 j = top_left_pixel.x; j < bot_right_pixel.x; ++j) {
+        for (i32 j = fill_rect.x_min; j < fill_rect.x_max; ++j) {
             pixels[j] = (u8)(color.r * 255.0f + 0.5f) << 24 | (u8)(color.g * 255.0f + 0.5f) << 16 |
                         (u8)(color.b * 255.0f + 0.5f) << 8 | (u8)(color.a * 255.0f + 0.5f) << 0;
         }
@@ -197,10 +182,6 @@ static void render_block(v2 pos, v2 size, v4 color, camera_t *cam, game_frame_bu
 #define m128_access(a, i) ((f32 *)&a)[i]
 #define m128_access8(a, i) ((u8 *)&a)[i]
 
-typedef struct {
-    v2i min, max;
-} clip_rect_t;
-
 #ifdef GG_DEBUG
 typedef struct {
     u8 a, b, g, r;
@@ -208,7 +189,7 @@ typedef struct {
 #endif
 
 static void
-render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer, aabb2i_t clip_rect)
+render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer, aabb2i_t clip_rect)
 {
     START_COUNTER(render_rotated_block);
     basis_t basis = cmd->header.basis;
@@ -219,7 +200,7 @@ render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
 
     i32 max_width = frame_buffer->w - 1;
     i32 max_height = frame_buffer->h - 1;
-    aabb2i_t fill_rect = AABB2I(max_width, max_height, 0, 0);
+    aabb2i_t fill_rect = aabb2i_inverted_infinity();
 
     // NOTE(Wes): Find the max rect we could possible draw in regardless
     // of rotation.
@@ -257,7 +238,7 @@ render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
     }
 
     // NOTE(Wes): Clip to clip rect edges.
-    fill_rect = aab2i_intersect(fill_rect, clip_rect);
+    fill_rect = aabb2i_intersect(fill_rect, clip_rect);
 
     // Align the 4px write to x_max and write mask overwrite on x_min boundary.
     __m128i start_clip_mask = _mm_set1_epi32(0xFFFFFFFF);
@@ -521,7 +502,7 @@ render_image(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
     END_COUNTER(render_rotated_block);
 }
 
-static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer)
+static void render_rotated_block(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer)
 {
     START_COUNTER(render_rotated_block);
     basis_t basis = cmd->header.basis;
@@ -700,7 +681,7 @@ static void render_rotated_block(render_cmd_block_t *cmd, camera_t *cam, game_fr
     END_COUNTER(render_rotated_block);
 }
 
-static void render_line(render_cmd_line_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer)
+static void render_rect(render_cmd_rect_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer, aabb2i_t clip_rect)
 {
     basis_t basis = cmd->header.basis;
 
@@ -708,12 +689,7 @@ static void render_line(render_cmd_line_t *cmd, camera_t *cam, game_frame_buffer
     v2 x_axis = v2_mul(basis.x_axis, cam->units_to_pixels);
     v2 y_axis = v2_mul(basis.y_axis, cam->units_to_pixels);
 
-    i32 max_width = frame_buffer->w - 1;
-    i32 max_height = frame_buffer->h - 1;
-    i32 x_min = max_width;
-    i32 x_max = 0;
-    i32 y_min = max_height;
-    i32 y_max = 0;
+    aabb2i_t fill_rect = aabb2i_inverted_infinity();
 
     // NOTE(Wes): Find the max rect we could possible draw in regardless
     v2i floor_bounds[4];
@@ -731,52 +707,39 @@ static void render_line(render_cmd_line_t *cmd, camera_t *cam, game_frame_buffer
     for (u32 i = 0; i < 4; ++i) {
         v2i floor_bound = floor_bounds[i];
         v2i ceil_bound = ceil_bounds[i];
-        if (x_min > floor_bound.x) {
-            x_min = floor_bound.x;
+        if (fill_rect.x_min > floor_bound.x) {
+            fill_rect.x_min = floor_bound.x;
         }
-        if (y_min > floor_bound.y) {
-            y_min = floor_bound.y;
+        if (fill_rect.y_min > floor_bound.y) {
+            fill_rect.y_min = floor_bound.y;
         }
-        if (x_max < ceil_bound.x) {
-            x_max = ceil_bound.x;
+        if (fill_rect.x_max < ceil_bound.x) {
+            fill_rect.x_max = ceil_bound.x;
         }
-        if (y_max < ceil_bound.y) {
-            y_max = ceil_bound.y;
+        if (fill_rect.y_max < ceil_bound.y) {
+            fill_rect.y_max = ceil_bound.y;
         }
     }
 
-    // NOTE(Wes): Clip to frame_buffer edges.
-    if (x_min < 0) {
-        x_min = 0;
-    }
-    if (x_max > max_width) {
-        x_max = max_width;
-    }
-    if (y_min < 0) {
-        y_min = 0;
-    }
-    if (y_max < max_height) {
-        y_max = max_height;
-    }
+    fill_rect = aabb2i_intersect(fill_rect, clip_rect);
+
+    f32 inv_x_len_sq = 1.0f / v2_len_sq(x_axis);
+    f32 inv_y_len_sq = 1.0f / v2_len_sq(y_axis);
+    v2 n_x_axis = v2_mul(x_axis, inv_x_len_sq);
+    v2 n_y_axis = v2_mul(y_axis, inv_y_len_sq);
 
     v4 color = cmd->color;
     u8 *fb_data = frame_buffer->data;
-    for (i32 y = y_min; y <= y_max; y++) {
-        for (i32 x = x_min; x <= x_max; x++) {
+    for (i32 y = fill_rect.y_min; y < fill_rect.y_max; y++) {
+        for (i32 x = fill_rect.x_min; x < fill_rect.x_max; x++) {
             // NOTE(Wes): Take the dot product of the point and the axis
             // perpendicular to the one we are testing to see which side
             // the point lies on. This code moves the point p in an
             // anti-clockwise direction.
             v2 p_orig = v2_sub(V2(x, y), origin);
-            v2 p = p_orig;
-            f32 edge1 = v2_dot(p, v2_neg(y_axis));
-            p = v2_sub(p, x_axis);
-            f32 edge2 = v2_dot(p, x_axis);
-            p = v2_sub(p, y_axis);
-            f32 edge3 = v2_dot(p, y_axis);
-            p = v2_add(p, x_axis);
-            f32 edge4 = v2_dot(p, v2_neg(x_axis));
-            if (edge1 < 0 && edge2 < 0 && edge3 < 0 && edge4 < 0) {
+            f32 u = v2_dot(p_orig, n_x_axis);
+            f32 v = v2_dot(p_orig, n_y_axis);
+            if (u >= 0.0f && u <= 1.0f && v >= 0.0f && v <= 1.0f) {
                 u32 *fb_pixel = (u32 *)&fb_data[(x * GG_BYTES_PP) + y * frame_buffer->pitch];
                 v4 dest_color = read_frame_buffer_color(*fb_pixel);
                 dest_color = srgb_to_linear(dest_color);
@@ -807,25 +770,16 @@ void render_push_clear(render_queue_t *queue, v4 color)
     cmd->color = color;
 }
 
-void render_push_block(render_queue_t *queue, v2 pos, v2 size, v4 tint)
+void render_push_image(render_queue_t *queue,
+                       basis_t *basis,
+                       v4 tint,
+                       image_t *image,
+                       image_t *normals,
+                       light_t *lights,
+                       int num_lights)
 {
-    render_cmd_block_t *cmd = (render_cmd_block_t *)render_push_cmd(queue, sizeof(render_cmd_block_t));
-    cmd->header.type = render_type_block;
-    cmd->pos = pos;
-    cmd->size = size;
-    cmd->tint = tint;
-}
-
-void render_push_rotated_block(render_queue_t *queue,
-                               basis_t *basis,
-                               v4 tint,
-                               image_t *image,
-                               image_t *normals,
-                               light_t *lights,
-                               int num_lights)
-{
-    render_cmd_block_t *cmd = (render_cmd_block_t *)render_push_cmd(queue, sizeof(render_cmd_block_t));
-    cmd->header.type = render_type_rotated_block;
+    render_cmd_image_t *cmd = (render_cmd_image_t *)render_push_cmd(queue, sizeof(render_cmd_image_t));
+    cmd->header.type = render_type_image;
     cmd->header.basis = *basis;
     cmd->tint = tint;
     cmd->image = image;
@@ -834,10 +788,10 @@ void render_push_rotated_block(render_queue_t *queue,
     cmd->num_lights = num_lights;
 }
 
-void render_push_line(render_queue_t *queue, basis_t *basis, v2 start, v2 end, f32 width, v4 color)
+void render_push_rect(render_queue_t *queue, basis_t *basis, v2 start, v2 end, f32 width, v4 color)
 {
-    render_cmd_line_t *cmd = (render_cmd_line_t *)render_push_cmd(queue, sizeof(render_cmd_line_t));
-    cmd->header.type = render_type_line;
+    render_cmd_rect_t *cmd = (render_cmd_rect_t *)render_push_cmd(queue, sizeof(render_cmd_rect_t));
+    cmd->header.type = render_type_rect;
     cmd->header.basis = *basis;
     cmd->start = start;
     cmd->end = end;
@@ -856,7 +810,7 @@ render_queue_t *render_alloc_queue(memory_arena_t *arena, u32 max_render_queue_s
 }
 
 typedef struct {
-    render_cmd_block_t *cmd;
+    render_cmd_image_t *cmd;
     camera_t *camera;
     game_frame_buffer_t *frame_buffer;
     aabb2i_t clip_rect;
@@ -868,62 +822,68 @@ void render_worker(void *data)
     render_image(work->cmd, work->camera, work->frame_buffer, work->clip_rect);
 }
 
-void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer, game_work_queues_t *work_queues)
+void render_draw_tile(render_queue_t *queue,
+                      game_frame_buffer_t *frame_buffer,
+                      game_work_queues_t *work_queues,
+                      aabb2i_t clip_rect)
 {
     START_COUNTER(render_draw_queue);
-#define WORK_INFO_SIZE 400
-    render_work_t work_infos[WORK_INFO_SIZE];
-    u32 work_index = 0;
     for (u32 address = 0; address < queue->index;) {
         render_cmd_header_t *header = (render_cmd_header_t *)(queue->base + address);
         switch (header->type) {
         case render_type_clear:
-            render_clear((render_cmd_clear_t *)header, frame_buffer);
+            render_clear((render_cmd_clear_t *)header, frame_buffer, clip_rect);
             address += sizeof(render_cmd_clear_t);
             break;
-        case render_type_block: {
-            render_cmd_block_t *cmd = (render_cmd_block_t *)header;
-            render_block(cmd->pos, cmd->size, cmd->tint, queue->camera, frame_buffer);
-            address += sizeof(render_cmd_block_t);
-        } break;
-        case render_type_rotated_block: {
+        case render_type_image: {
             // render_rotated_block((render_cmd_block_t *)header, queue->camera, frame_buffer);
 
-            u32 const tile_y_count = 1;
-            u32 const tile_x_count = 1;
-            u32 height = frame_buffer->h;
-            u32 width = frame_buffer->w;
-            u32 tile_height = height / tile_y_count;
-            u32 tile_width = width / tile_x_count;
-            for (u32 y = 0; y < tile_y_count; ++y) {
-                for (u32 x = 0; x < tile_x_count; ++x) {
-                    u32 min_y = y * tile_height;
-                    u32 min_x = x * tile_width;
-                    u32 max_y = min_y + tile_height;
-                    u32 max_x = min_x + tile_width;
 
-                    render_work_t *work = work_infos + work_index++;
-                    work->cmd = (render_cmd_block_t *)header;
-                    work->camera = queue->camera;
-                    work->frame_buffer = frame_buffer;
-                    work->clip_rect = AABB2I(min_x, min_y, max_x, max_y);
-                    work_queues->add_work(work_queues->render_work_queue, render_worker, work);
-                }
-            }
-
+            //        render_work_t *work = work_infos + work_index++;
+            //        work->cmd = (render_cmd_block_t *)header;
+            //        work->camera = queue->camera;
+            //        work->frame_buffer = frame_buffer;
+            //        work->clip_rect = clip_rect;
+            //        work_queues->add_work(work_queues->render_work_queue, render_worker, work);
 
            // clip_rect_t clip_rect = {V2I(5, 5), V2I(250, 250)};
-           // render_image((render_cmd_block_t *)header, queue->camera, frame_buffer, clip_rect);
-            address += sizeof(render_cmd_block_t);
+            render_image((render_cmd_image_t *)header, queue->camera, frame_buffer, clip_rect);
+            address += sizeof(render_cmd_image_t);
         } break;
-        case render_type_line:
-            render_line((render_cmd_line_t *)header, queue->camera, frame_buffer);
-            address += sizeof(render_cmd_line_t);
+        case render_type_rect:
+            render_rect((render_cmd_rect_t *)header, queue->camera, frame_buffer, clip_rect);
+            address += sizeof(render_cmd_rect_t);
             break;
         }
     }
 
-    work_queues->finish_work(work_queues->render_work_queue);
-    queue->index = 0;
+    // work_queues->finish_work(work_queues->render_work_queue);
     END_COUNTER(render_draw_queue);
+}
+
+void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer, game_work_queues_t *work_queues)
+{
+#define WORK_INFO_SIZE 400
+ //   render_work_t work_infos[WORK_INFO_SIZE];
+ //   u32 work_index = 0;
+
+    u32 const tile_y_count = 4;
+    u32 const tile_x_count = 4;
+    u32 height = frame_buffer->h;
+    u32 width = frame_buffer->w;
+    u32 tile_height = height / tile_y_count;
+    u32 tile_width = width / tile_x_count;
+    for (u32 y = 0; y < tile_y_count; ++y) {
+        for (u32 x = 0; x < tile_x_count; ++x) {
+            aabb2i_t clip_rect;
+            clip_rect.y_min = y * tile_height + 4;
+            clip_rect.x_min = x * tile_width + 4;
+            clip_rect.y_max = clip_rect.y_min + tile_height - 8;
+            clip_rect.x_max = clip_rect.x_min + tile_width - 8;
+
+            render_draw_tile(queue, frame_buffer, work_queues, clip_rect);
+        }
+    }
+
+    queue->index = 0;
 }

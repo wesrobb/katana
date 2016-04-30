@@ -578,13 +578,13 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
                 tile_origin.x = j * tilemap->tile_size.x;
                 tile_origin.y = i * tilemap->tile_size.y;
                 basis_t tile_basis = {tile_origin, V2(tilemap->tile_size.x, 0.0f), V2(0.0f, tilemap->tile_size.y)};
-                render_push_rotated_block(game_state->render_queue,
-                                          &tile_basis,
-                                          V4(1.0f, 1.0f, 1.0f, 0.1f),
-                                          &game_state->tile_image,
-                                          0,
-                                          &light,
-                                          1);
+                render_push_image(game_state->render_queue,
+                                  &tile_basis,
+                                  V4(1.0f, 1.0f, 1.0f, 0.1f),
+                                  &game_state->tile_image,
+                                  0,
+                                  &light,
+                                  1);
             }
         }
     }
@@ -604,13 +604,13 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
             v2 draw_offset = V2(0.0f, 0.0f);
             v2 draw_pos = v2_add(entity->position, draw_offset);
             basis_t player_basis = {draw_pos, V2(entity->size.x, 0.0f), V2(0.0f, entity->size.y)};
-            render_push_rotated_block(game_state->render_queue,
-                                      &player_basis,
-                                      V4(1.0f, 1.0f, 1.0f, 1.0f),
-                                      &game_state->player_image,
-                                      &game_state->player_normal,
-                                      &light,
-                                      1);
+            render_push_image(game_state->render_queue,
+                              &player_basis,
+                              V4(1.0f, 1.0f, 1.0f, 1.0f),
+                              &game_state->player_image,
+                              &game_state->player_normal,
+                              &light,
+                              1);
         }
     }
 
@@ -630,8 +630,8 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
         line_color2 = V4(1.0f, 0.0f, 1.0f, 1.0f);
     }
 
-    render_push_line(game_state->render_queue, &line1_basis, V2(0, 0), V2(0, 0), 5.0f, line_color1);
-    render_push_line(game_state->render_queue, &line2_basis, V2(0, 0), V2(0, 0), 5.0f, line_color2);
+    render_push_rect(game_state->render_queue, &line1_basis, V2(0, 0), V2(0, 0), 5.0f, line_color1);
+    render_push_rect(game_state->render_queue, &line2_basis, V2(0, 0), V2(0, 0), 5.0f, line_color2);
 #endif
     render_draw_queue(game_state->render_queue, frame_buffer, work_queues);
 
