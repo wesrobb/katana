@@ -64,7 +64,7 @@ typedef union {
         f32 x, y, z, w;
     };
     struct {
-        f32 r, g, b, a;
+        f32 a, r, g, b;
     };
     struct {
         v2 xy, zw;
@@ -74,8 +74,8 @@ typedef union {
         f32 w_;
     };
     struct {
-        v3 rgb;
         f32 a_;
+        v3 rgb;
     };
     struct {
         f32 x_;
@@ -95,11 +95,11 @@ typedef union {
             x, y, z, w                                                                                                 \
         }                                                                                                              \
     }
-#define COLOR(r, g, b, a)                                                                                              \
+#define COLOR(a, r, g, b)                                                                                              \
     (v4)                                                                                                               \
     {                                                                                                                  \
         {                                                                                                              \
-            r, g, b, a                                                                                                 \
+            a, r, g, b                                                                                                 \
         }                                                                                                              \
     }
 

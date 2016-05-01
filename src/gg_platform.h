@@ -72,7 +72,7 @@ typedef double f64;
 enum {
     dbg_counter_game_update_and_render,
     dbg_counter_render_draw_queue,
-    dbg_counter_render_rotated_block,
+    dbg_counter_render_image,
     dbg_counter_process_pixel,
     dbg_counter_count
 };

@@ -376,6 +376,15 @@ static image_t load_image(const char *path, load_file_fn load_file)
     for (u32 y = 0; y < result.h; y++) {
         for (u32 x = 0; x < result.w; x++) {
             u32 *texel = &result.data[x + y * result.w];
+
+            // Convert RGBA -> ARGB
+            u32 temp = *texel;
+            u32 a = (temp & 0xFF000000) >> 24;
+            temp <<= 8;
+            temp |= a;
+
+            *texel = temp;
+
             v4 color = read_image_color(*texel);
 
             // NOTE(Wes): Convert to linear space before premultiplying alpha.
@@ -454,7 +463,6 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
         game_state->background_image = load_image("data/background/Bg 1.png", callbacks->load_file);
         game_state->tile_image = load_image("data/tiles/Box 01.png", callbacks->load_file);
         game_state->player_image = load_image("data/player/test.png", callbacks->load_file);
-        game_state->player_normal = load_image("data/sphere_normals.png", callbacks->load_file);
 
         init_arena(&game_state->arena,
                    memory->permanent_store_size - sizeof(game_state_t),
@@ -478,7 +486,7 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
             // NOTE(Wes): Initialize the player
             entity_t *entity = &game_state->world.entities[controlled_entity];
             entity->type = entity_type_player;
-            entity->position.x = 50.0f;
+            entity->position.x = 80.0f;
             entity->position.y = 54.0f;
             entity->size.x = 2.0f;
             entity->size.y = 4.0f;
@@ -549,7 +557,8 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
     }
 #endif
     // NOTE(Wes): Start by clearing the screen.
-    render_push_clear(game_state->render_queue, COLOR(0.3f, 0.5f, 1.0f, 1.0f));
+    render_push_clear(game_state->render_queue, COLOR(1.0f, 0.5f, 0.5f, 0.5f));
+    //render_push_clear(game_state->render_queue, COLOR(1.0f, 1.0f, 0.0f, 0.0f));
     game_state->elapsed_time += input->delta_time;
     f32 angle = game_state->elapsed_time * 0.5f;
     v2 light_origin = v2_mul(V2(kcosf(angle), ksinf(angle)), 10);
@@ -624,10 +633,10 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
     basis_t line1_basis = {o, x, y};
     basis_t line2_basis = {o2, x2, y2};
 
-    v4 line_color1 = V4(1.0f, 1.0f, 0.0f, 1.0f);
-    v4 line_color2 = V4(1.0f, 0.0f, 0.0f, 1.0f);
+    v4 line_color1 = COLOR(1.0f, 1.0f, 0.0f, 0.0f);
+    v4 line_color2 = COLOR(1.0f, 0.0f, 1.0f, 0.0f);
     if (collider_contains_point(&line1_basis, line2_basis.origin)) {
-        line_color2 = V4(1.0f, 0.0f, 1.0f, 1.0f);
+        line_color2 = COLOR(1.0f, 0.0f, 1.0f, 0.0f);
     }
 
     render_push_rect(game_state->render_queue, &line1_basis, V2(0, 0), V2(0, 0), 5.0f, line_color1);

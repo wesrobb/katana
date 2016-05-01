@@ -479,7 +479,7 @@ int main(void)
     i32 window_width = 960;
     i32 window_height = 540;
     i32 windoy_pos_x = 0;
-    i32 windoy_pos_y = 450;
+    i32 windoy_pos_y = 0;
 
     SDL_Window *window = SDL_CreateWindow("gg", windoy_pos_x, windoy_pos_y,
                                           window_width, window_height, SDL_WINDOW_RESIZABLE);
@@ -490,10 +490,11 @@ int main(void)
     u32 render_flags = SDL_RENDERER_ACCELERATED;
 #endif
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, render_flags);
-    u32 frame_buffer_width = 1280;
-    u32 frame_buffer_height = 720;
+    u32 frame_buffer_width = 1920;
+    u32 frame_buffer_height = 1080;
+    u8 *pixels = (u8 *)malloc(frame_buffer_width * frame_buffer_height * GG_BYTES_PP);
     SDL_Texture *texture = SDL_CreateTexture(
-        renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, frame_buffer_width, frame_buffer_height);
+        renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, frame_buffer_width, frame_buffer_height);
 
     SDL_AudioSpec audio_spec_want = {0};
     audio_spec_want.freq = 48000;
@@ -593,6 +594,10 @@ int main(void)
                 }
                 break;
             case SDL_KEYDOWN:
+                if (event.key.keysym.sym == SDLK_f) {
+                    u32 is_fullscreen = SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN_DESKTOP;
+                    SDL_SetWindowFullscreen(window, is_fullscreen ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
+                }
                 if (event.key.keysym.sym == SDLK_r) {
                     if (playing_back) {
                         SDL_LogInfo(
@@ -657,11 +662,14 @@ int main(void)
         }
 
         // NOTE(Wes): The frame buffer pixels point directly to the SDL texture.
-        SDL_LockTexture(texture, 0, (void **)&frame_buffer.data, (i32 *)&frame_buffer.pitch);
+        //SDL_LockTexture(texture, 0, (void **)&frame_buffer.data, (i32 *)&frame_buffer.pitch);
+        frame_buffer.data = pixels;
+        frame_buffer.pitch = frame_buffer_width * GG_BYTES_PP;
 
         game.update_and_render_fn(&game_memory, &frame_buffer, &audio, new_input,
                                   &output, &callbacks, &game_work_queues);
-        SDL_UnlockTexture(texture);
+        //SDL_UnlockTexture(texture);
+        SDL_UpdateTexture(texture, 0, pixels, frame_buffer.pitch);
 
         SDL_RenderCopy(renderer, texture, 0, 0);
         SDL_RenderPresent(renderer);

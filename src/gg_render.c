@@ -51,15 +51,15 @@ static inline v4 read_frame_buffer_color(u32 buffer)
 
 static inline u32 color_frame_buffer_u32(v4 color)
 {
-    u32 result = ((u32)(color.r * 255.0f + 0.5f) & 0xFF) << 24 | ((u32)(color.g * 255.0f + 0.5f) & 0xFF) << 16 |
-                 ((u32)(color.b * 255.0f + 0.5f) & 0xFF) << 8 | ((u32)(color.a * 255.0f + 0.5f) & 0xFF);
+    u32 result = ((u32)(color.a * 255.0f + 0.5f) & 0xFF) << 24 | ((u32)(color.r * 255.0f + 0.5f) & 0xFF) << 16 |
+                 ((u32)(color.g * 255.0f + 0.5f) & 0xFF) << 8 | ((u32)(color.b * 255.0f + 0.5f) & 0xFF);
     return result;
 }
 
 u32 color_image_32(v4 color)
 {
-    u32 result = ((u32)(color.r * 255) & 0xFF) << 0 | ((u32)(color.g * 255) & 0xFF) << 8 |
-                 ((u32)(color.b * 255) & 0xFF) << 16 | ((u32)(color.a * 255) & 0xFF) << 24;
+    u32 result = ((u32)(color.a * 255) & 0xFF) << 0 | ((u32)(color.r * 255) & 0xFF) << 8 |
+                 ((u32)(color.g * 255) & 0xFF) << 16 | ((u32)(color.b * 255) & 0xFF) << 24;
     return result;
 }
 
@@ -109,24 +109,24 @@ static inline v4 linear_blend_tint(v4 color, v4 tint, v4 dest)
 // pixel as RR BB GG AA.
 static inline void linear_blend_texel(u32 texel, u32 *dest)
 {
-    u8 rs = (u8)((texel >> 0) & 0xFF);
-    u8 gs = (u8)((texel >> 8) & 0xFF);
-    u8 bs = (u8)((texel >> 16) & 0xFF);
-    u8 as = (u8)((texel >> 24) & 0xFF);
+    u8 as = (u8)((texel >> 0) & 0xFF);
+    u8 rs = (u8)((texel >> 8) & 0xFF);
+    u8 gs = (u8)((texel >> 16) & 0xFF);
+    u8 bs = (u8)((texel >> 24) & 0xFF);
 
     f32 a = as / 255.0f;
     f32 inv_alpha = 1.0f - a;
 
-    u8 rd = (*dest >> 24) & 0xFF;
-    u8 gd = (*dest >> 16) & 0xFF;
-    u8 bd = (*dest >> 8) & 0xFF;
-    u8 ad = (*dest >> 0) & 0xFF;
+    u8 ad = (*dest >> 24) & 0xFF;
+    u8 rd = (*dest >> 16) & 0xFF;
+    u8 gd = (*dest >> 8) & 0xFF;
+    u8 bd = (*dest >> 0) & 0xFF;
 
     u8 r = (u8)(rs + 0.5f) + (u8)(rd * inv_alpha + 0.5f);
     u8 g = (u8)(gs + 0.5f) + (u8)(gd * inv_alpha + 0.5f);
     u8 b = (u8)(bs + 0.5f) + (u8)(bd * inv_alpha + 0.5f);
 
-    u32 temp = r << 24 | g << 16 | b << 8 | ad << 0;
+    u32 temp = ad << 24 | r << 16 | g << 8 | b << 0;
 
     *dest = temp;
 }
@@ -136,44 +136,8 @@ static void render_clear(render_cmd_clear_t *cmd, game_frame_buffer_t *frame_buf
     for (i32 y = clip_rect.y_min; y < clip_rect.y_max; ++y) {
         u32 *pixels = (u32 *)(frame_buffer->data + y * frame_buffer->pitch);
         for (i32 x = clip_rect.x_min; x < clip_rect.x_max; ++x) {
-            pixels[x] = (u8)(cmd->color.r * 255.0f + 0.5f) << 24 | (u8)(cmd->color.g * 255.0f + 0.5f) << 16 |
-                        (u8)(cmd->color.b * 255.0f + 0.5f) << 8 | (u8)(cmd->color.a * 255.0f + 0.5f) << 0;
-        }
-    }
-}
-
-static void render_block(v2 pos, v2 size, v4 color, camera_t *cam, game_frame_buffer_t *frame_buffer, aabb2i_t clip_rect)
-{
-    f32 units_to_pixels = cam->units_to_pixels;
-    f32 frame_width_units = frame_buffer->w / units_to_pixels;
-    f32 frame_height_units = frame_buffer->h / units_to_pixels;
-    v2 frame_buffer_half_size = V2(frame_width_units / 2.0f, frame_height_units / 2.0f);
-
-    // Calculate top left and bottom right of block.
-    v2 half_size = v2_div(size, 2.0f);
-    v2 top_left_corner = v2_sub(pos, half_size);
-    v2 bot_right_corner = v2_add(pos, half_size);
-
-    // Add draw offsets.
-    v2 draw_offset = v2_sub(cam->position, frame_buffer_half_size);
-    top_left_corner = v2_sub(top_left_corner, draw_offset);
-    bot_right_corner = v2_sub(bot_right_corner, draw_offset);
-
-    // Convert to pixel values and round to nearest integer.
-    top_left_corner = v2_mul(top_left_corner, units_to_pixels);
-    bot_right_corner = v2_mul(bot_right_corner, units_to_pixels);
-    v2i top_left_pixel;
-    v2i bot_right_pixel;
-    v2_floor2(top_left_corner, bot_right_corner, &top_left_pixel, &bot_right_pixel);
-
-    aabb2i_t fill_rect = AABB2I(top_left_pixel.x, top_left_pixel.y, bot_right_pixel.x, bot_right_pixel.y);
-    fill_rect = aabb2i_intersect(fill_rect, clip_rect);
-
-    for (i32 i = fill_rect.y_min; i < fill_rect.y_max; ++i) {
-        u32 *pixels = (u32 *)(frame_buffer->data + i * frame_buffer->pitch);
-        for (i32 j = fill_rect.x_min; j < fill_rect.x_max; ++j) {
-            pixels[j] = (u8)(color.r * 255.0f + 0.5f) << 24 | (u8)(color.g * 255.0f + 0.5f) << 16 |
-                        (u8)(color.b * 255.0f + 0.5f) << 8 | (u8)(color.a * 255.0f + 0.5f) << 0;
+            pixels[x] = (u8)(cmd->color.a * 255.0f + 0.5f) << 24 | (u8)(cmd->color.r * 255.0f + 0.5f) << 16 |
+                        (u8)(cmd->color.g * 255.0f + 0.5f) << 8 | (u8)(cmd->color.b * 255.0f + 0.5f) << 0;
         }
     }
 }
@@ -191,7 +155,7 @@ typedef struct {
 static void
 render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer, aabb2i_t clip_rect)
 {
-    START_COUNTER(render_rotated_block);
+    START_COUNTER(render_image);
     basis_t basis = cmd->header.basis;
 
     v2 origin = v2_mul(basis.origin, cam->units_to_pixels);
@@ -233,12 +197,23 @@ render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
         }
     }
 
+#if 1
+    // NOTE(Wes): Clip to clip rect edges.
+    fill_rect = aabb2i_intersect(fill_rect, clip_rect);
+
     if (!aabb2i_has_area(fill_rect)) {
+        END_COUNTER(render_image);
+        return;
+    }
+#else
+    if (!aabb2i_has_area(fill_rect)) {
+        END_COUNTER(render_image);
         return;
     }
 
     // NOTE(Wes): Clip to clip rect edges.
     fill_rect = aabb2i_intersect(fill_rect, clip_rect);
+#endif
 
     // Align the 4px write to x_max and write mask overwrite on x_min boundary.
     __m128i start_clip_mask = _mm_set1_epi32(0xFFFFFFFF);
@@ -367,76 +342,76 @@ render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
                                               *(base_addr4 + texture_width + 1));
 
             // Pack the 4 samples into 4 texels (rrrr, gggg, bbbb, aaaa)
-            __m128i texel_a_r4i = _mm_and_si128(texel_mask, sample_a);
-            __m128i texel_a_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_a, 8));
-            __m128i texel_a_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_a, 16));
-            __m128i texel_a_a4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_a, 24));
+            __m128i texel_a_a4i = _mm_and_si128(texel_mask, sample_a);
+            __m128i texel_a_r4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_a, 8));
+            __m128i texel_a_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_a, 16));
+            __m128i texel_a_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_a, 24));
 
-            __m128i texel_b_r4i = _mm_and_si128(texel_mask, sample_b);
-            __m128i texel_b_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_b, 8));
-            __m128i texel_b_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_b, 16));
-            __m128i texel_b_a4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_b, 24));
+            __m128i texel_b_a4i = _mm_and_si128(texel_mask, sample_b);
+            __m128i texel_b_r4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_b, 8));
+            __m128i texel_b_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_b, 16));
+            __m128i texel_b_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_b, 24));
 
-            __m128i texel_c_r4i = _mm_and_si128(texel_mask, sample_c);
-            __m128i texel_c_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_c, 8));
-            __m128i texel_c_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_c, 16));
-            __m128i texel_c_a4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_c, 24));
+            __m128i texel_c_a4i = _mm_and_si128(texel_mask, sample_c);
+            __m128i texel_c_r4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_c, 8));
+            __m128i texel_c_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_c, 16));
+            __m128i texel_c_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_c, 24));
 
-            __m128i texel_d_r4i = _mm_and_si128(texel_mask, sample_d);
-            __m128i texel_d_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_d, 8));
-            __m128i texel_d_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_d, 16));
-            __m128i texel_d_a4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_d, 24));
+            __m128i texel_d_a4i = _mm_and_si128(texel_mask, sample_d);
+            __m128i texel_d_r4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_d, 8));
+            __m128i texel_d_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_d, 16));
+            __m128i texel_d_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(sample_d, 24));
 
             // Convert packed texels from u8 in range 0-255 to f32 in range 0-1.
+            __m128 texel_a_a4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_a_a4i), inv_255);
             __m128 texel_a_r4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_a_r4i), inv_255);
             __m128 texel_a_g4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_a_g4i), inv_255);
             __m128 texel_a_b4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_a_b4i), inv_255);
-            __m128 texel_a_a4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_a_a4i), inv_255);
 
+            __m128 texel_b_a4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_b_a4i), inv_255);
             __m128 texel_b_r4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_b_r4i), inv_255);
             __m128 texel_b_g4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_b_g4i), inv_255);
             __m128 texel_b_b4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_b_b4i), inv_255);
-            __m128 texel_b_a4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_b_a4i), inv_255);
 
+            __m128 texel_c_a4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_c_a4i), inv_255);
             __m128 texel_c_r4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_c_r4i), inv_255);
             __m128 texel_c_g4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_c_g4i), inv_255);
             __m128 texel_c_b4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_c_b4i), inv_255);
-            __m128 texel_c_a4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_c_a4i), inv_255);
 
+            __m128 texel_d_a4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_d_a4i), inv_255);
             __m128 texel_d_r4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_d_r4i), inv_255);
             __m128 texel_d_g4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_d_g4i), inv_255);
             __m128 texel_d_b4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_d_b4i), inv_255);
-            __m128 texel_d_a4 = _mm_mul_ps(_mm_cvtepi32_ps(texel_d_a4i), inv_255);
 
             // Optimized linear blend
             __m128 c0 = _mm_mul_ps(subpixel_x4, subpixel_y4);
             __m128 c1 = _mm_mul_ps(inv_subpixel_x4, subpixel_y4);
             __m128 c2 = _mm_mul_ps(subpixel_x4, inv_subpixel_y4);
             __m128 c3 = _mm_mul_ps(inv_subpixel_x4, inv_subpixel_y4);
+            __m128 blended_a4 = _mm_add_ps(_mm_add_ps(_mm_mul_ps(texel_d_a4, c0), _mm_mul_ps(texel_c_a4, c1)),
+                                           _mm_add_ps(_mm_mul_ps(texel_b_a4, c2), _mm_mul_ps(texel_a_a4, c3)));
             __m128 blended_r4 = _mm_add_ps(_mm_add_ps(_mm_mul_ps(texel_d_r4, c0), _mm_mul_ps(texel_c_r4, c1)),
                                            _mm_add_ps(_mm_mul_ps(texel_b_r4, c2), _mm_mul_ps(texel_a_r4, c3)));
             __m128 blended_g4 = _mm_add_ps(_mm_add_ps(_mm_mul_ps(texel_d_g4, c0), _mm_mul_ps(texel_c_g4, c1)),
                                            _mm_add_ps(_mm_mul_ps(texel_b_g4, c2), _mm_mul_ps(texel_a_g4, c3)));
             __m128 blended_b4 = _mm_add_ps(_mm_add_ps(_mm_mul_ps(texel_d_b4, c0), _mm_mul_ps(texel_c_b4, c1)),
                                            _mm_add_ps(_mm_mul_ps(texel_b_b4, c2), _mm_mul_ps(texel_a_b4, c3)));
-            __m128 blended_a4 = _mm_add_ps(_mm_add_ps(_mm_mul_ps(texel_d_a4, c0), _mm_mul_ps(texel_c_a4, c1)),
-                                           _mm_add_ps(_mm_mul_ps(texel_b_a4, c2), _mm_mul_ps(texel_a_a4, c3)));
 
             __m128i *fb_pixel = (__m128i *)&fb_data[(x * GG_BYTES_PP) + y * frame_buffer->pitch];
             // TODO(Wes): Align our framebuffer on the 16 byte boundary
             __m128i fb_pixel_packed = _mm_loadu_si128(fb_pixel);
 
             // Convert current value in framebuffer to rrrr, gggg, bbbb, aaaa
-            __m128i fb_pixel_a4i = _mm_and_si128(texel_mask, fb_pixel_packed);
-            __m128i fb_pixel_b4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel_packed, 8));
-            __m128i fb_pixel_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel_packed, 16));
-            __m128i fb_pixel_r4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel_packed, 24));
+            __m128i fb_pixel_b4i = _mm_and_si128(texel_mask, fb_pixel_packed);
+            __m128i fb_pixel_g4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel_packed, 8));
+            __m128i fb_pixel_r4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel_packed, 16));
+            __m128i fb_pixel_a4i = _mm_and_si128(texel_mask, _mm_srli_epi32(fb_pixel_packed, 24));
 
             // Convert packed frame buffer values from u8 (0-255) to f32 (0.0f-1.0f)
-            __m128 fb_pixel_a4 = _mm_mul_ps(_mm_cvtepi32_ps(fb_pixel_a4i), inv_255);
             __m128 fb_pixel_b4 = _mm_mul_ps(_mm_cvtepi32_ps(fb_pixel_b4i), inv_255);
             __m128 fb_pixel_g4 = _mm_mul_ps(_mm_cvtepi32_ps(fb_pixel_g4i), inv_255);
             __m128 fb_pixel_r4 = _mm_mul_ps(_mm_cvtepi32_ps(fb_pixel_r4i), inv_255);
+            __m128 fb_pixel_a4 = _mm_mul_ps(_mm_cvtepi32_ps(fb_pixel_a4i), inv_255);
 
             __m128 inv_alpha4 = _mm_sub_ps(one4, blended_a4);
             fb_pixel_r4 = _mm_add_ps(_mm_mul_ps(fb_pixel_r4, inv_alpha4), _mm_mul_ps(blended_r4, blended_a4));
@@ -449,19 +424,19 @@ render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
             fb_pixel_g4i = _mm_cvtps_epi32(_mm_mul_ps(fb_pixel_g4, two_fifty_five4));
             fb_pixel_r4i = _mm_cvtps_epi32(_mm_mul_ps(fb_pixel_r4, two_fifty_five4));
 
-            // Repack fb_pixels from rrrr, gggg, bbbb, aaaa to rbga, rgba, rgba, rgba
-            __m128i temp_ag_lo = _mm_unpacklo_epi32(fb_pixel_a4i, fb_pixel_g4i);
-            __m128i temp_ag_hi = _mm_unpackhi_epi32(fb_pixel_a4i, fb_pixel_g4i);
-            __m128i temp_br_lo = _mm_unpacklo_epi32(fb_pixel_b4i, fb_pixel_r4i);
-            __m128i temp_br_hi = _mm_unpackhi_epi32(fb_pixel_b4i, fb_pixel_r4i);
+            // Repack fb_pixels from  aaaa, rrrr, gggg, bbbb to arbg, argb, argb, argb
+            __m128i temp_bg_lo = _mm_unpacklo_epi32(fb_pixel_b4i, fb_pixel_g4i);
+            __m128i temp_bg_hi = _mm_unpackhi_epi32(fb_pixel_b4i, fb_pixel_g4i);
+            __m128i temp_ra_lo = _mm_unpacklo_epi32(fb_pixel_r4i, fb_pixel_a4i);
+            __m128i temp_ra_hi = _mm_unpackhi_epi32(fb_pixel_r4i, fb_pixel_a4i);
 
-            __m128i fb_pixel_0 = _mm_unpacklo_epi32(temp_ag_lo, temp_br_lo);
-            __m128i fb_pixel_1 = _mm_unpackhi_epi32(temp_ag_lo, temp_br_lo);
-            __m128i fb_pixel_2 = _mm_unpacklo_epi32(temp_ag_hi, temp_br_hi);
-            __m128i fb_pixel_3 = _mm_unpackhi_epi32(temp_ag_hi, temp_br_hi);
+            __m128i fb_pixel_0 = _mm_unpacklo_epi32(temp_bg_lo, temp_ra_lo);
+            __m128i fb_pixel_1 = _mm_unpackhi_epi32(temp_bg_lo, temp_ra_lo);
+            __m128i fb_pixel_2 = _mm_unpacklo_epi32(temp_bg_hi, temp_ra_hi);
+            __m128i fb_pixel_3 = _mm_unpackhi_epi32(temp_bg_hi, temp_ra_hi);
 
-            // Squash the RGBA values down to 32 bits in each SSE "slot"
-            // eg. 000a 000b 000g 000r -> abgr abgr abgr abgr
+            // Squash the ARGB values down to 32 bits in each SSE "slot"
+            // eg. 000b 000g 000r 000a -> bgra bgra bgra bgra
             fb_pixel_0 = _mm_packs_epi32(fb_pixel_0, fb_pixel_0);
             fb_pixel_0 = _mm_packus_epi16(fb_pixel_0, fb_pixel_0);
             fb_pixel_1 = _mm_packs_epi32(fb_pixel_1, fb_pixel_1);
@@ -471,7 +446,7 @@ render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
             fb_pixel_3 = _mm_packs_epi32(fb_pixel_3, fb_pixel_3);
             fb_pixel_3 = _mm_packus_epi16(fb_pixel_3, fb_pixel_3);
 
-            // Convert pixels from ABGR ABGR ABGR to ABGR 0000 0000 0000 etc to make them easy to OR together.
+            // Convert pixels from BGRA BGRA BGRA to BGRA 0000 0000 0000 etc to make them easy to OR together.
             fb_pixel_0 = _mm_and_si128(fb_pixel_0, first_mask);
             fb_pixel_1 = _mm_and_si128(fb_pixel_1, second_mask);
             fb_pixel_2 = _mm_and_si128(fb_pixel_2, third_mask);
@@ -488,10 +463,10 @@ render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
             u8 *debug_out = (u8 *)&masked_out;
             u32 mask_index = 0;
             for (u32 i = 0; i < 4; ++i) {
-                pixels[i].a = masked_out[mask_index++];
                 pixels[i].b = masked_out[mask_index++];
                 pixels[i].g = masked_out[mask_index++];
                 pixels[i].r = masked_out[mask_index++];
+                pixels[i].a = masked_out[mask_index++];
             }
 #endif
 
@@ -499,7 +474,7 @@ render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
         }
     }
     END_COUNTER_N(process_pixel, aabb2i_clamped_area(fill_rect));
-    END_COUNTER(render_rotated_block);
+    END_COUNTER(render_image);
 }
 
 static void render_image_naive(render_cmd_image_t *cmd,
@@ -507,7 +482,7 @@ static void render_image_naive(render_cmd_image_t *cmd,
                                game_frame_buffer_t *frame_buffer,
                                aabb2i_t clip_rect)
 {
-    START_COUNTER(render_rotated_block);
+    START_COUNTER(render_image);
     basis_t basis = cmd->header.basis;
 
     v2 origin = v2_mul(basis.origin, cam->units_to_pixels);
@@ -663,7 +638,7 @@ static void render_image_naive(render_cmd_image_t *cmd,
     }
 
     END_COUNTER_N(process_pixel, aabb2i_clamped_area(fill_rect));
-    END_COUNTER(render_rotated_block);
+    END_COUNTER(render_image);
 }
 
 static void render_rect(render_cmd_rect_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer, aabb2i_t clip_rect)
@@ -707,6 +682,9 @@ static void render_rect(render_cmd_rect_t *cmd, camera_t *cam, game_frame_buffer
     }
 
     fill_rect = aabb2i_intersect(fill_rect, clip_rect);
+    if (!aabb2i_has_area(fill_rect)) {
+        return;
+    }
 
     f32 inv_x_len_sq = 1.0f / v2_len_sq(x_axis);
     f32 inv_y_len_sq = 1.0f / v2_len_sq(y_axis);
@@ -717,10 +695,6 @@ static void render_rect(render_cmd_rect_t *cmd, camera_t *cam, game_frame_buffer
     u8 *fb_data = frame_buffer->data;
     for (i32 y = fill_rect.y_min; y < fill_rect.y_max; y++) {
         for (i32 x = fill_rect.x_min; x < fill_rect.x_max; x++) {
-            // NOTE(Wes): Take the dot product of the point and the axis
-            // perpendicular to the one we are testing to see which side
-            // the point lies on. This code moves the point p in an
-            // anti-clockwise direction.
             v2 p_orig = v2_sub(V2(x, y), origin);
             f32 u = v2_dot(p_orig, n_x_axis);
             f32 v = v2_dot(p_orig, n_y_axis);
@@ -812,21 +786,11 @@ void render_draw_tile(render_queue_t *queue,
             render_clear((render_cmd_clear_t *)header, frame_buffer, clip_rect);
             address += sizeof(render_cmd_clear_t);
             break;
-        case render_type_image: {
-
-
-            //        render_work_t *work = work_infos + work_index++;
-            //        work->cmd = (render_cmd_block_t *)header;
-            //        work->camera = queue->camera;
-            //        work->frame_buffer = frame_buffer;
-            //        work->clip_rect = clip_rect;
-            //        work_queues->add_work(work_queues->render_work_queue, render_worker, work);
-
-           // clip_rect_t clip_rect = {V2I(5, 5), V2I(250, 250)};
+        case render_type_image:
             render_image((render_cmd_image_t *)header, queue->camera, frame_buffer, clip_rect);
             //render_image_naive((render_cmd_image_t *)header, queue->camera, frame_buffer, clip_rect);
             address += sizeof(render_cmd_image_t);
-        } break;
+            break;
         case render_type_rect:
             render_rect((render_cmd_rect_t *)header, queue->camera, frame_buffer, clip_rect);
             address += sizeof(render_cmd_rect_t);
@@ -845,8 +809,6 @@ void render_worker(void *data)
 
 void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer, game_work_queues_t *work_queues)
 {
-#define WORK_INFO_SIZE 400
-
     u32 const tile_y_count = 4;
     u32 const tile_x_count = 4;
     render_work_t work_infos[tile_y_count * tile_x_count];
@@ -868,7 +830,12 @@ void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer,
             data->frame_buffer = frame_buffer;
             data->clip_rect = clip_rect;
 
-            //render_draw_tile(queue, frame_buffer, work_queues, clip_rect);
+            clip_rect.y_min = 0;
+            clip_rect.x_min = 0;
+            clip_rect.y_max = 1080;
+            clip_rect.x_max = 1920;
+
+            //render_draw_tile(queue, frame_buffer, clip_rect);
             work_queues->add_work(work_queues->render_work_queue, render_worker, data);
         }
     }
