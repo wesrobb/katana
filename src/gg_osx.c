@@ -14,6 +14,8 @@
 #include <sys/uio.h>
 #include <time.h>
 #include <unistd.h>
+#include <xmmintrin.h>
+#include <libkern/OSAtomic.h>
 
 #define Kilobytes(Value) ((Value)*1024LL)
 #define Megabytes(Value) (Kilobytes(Value) * 1024LL)
@@ -335,6 +337,7 @@ static void osx_handle_debug_counters(game_memory_t *memory, b8 must_print)
 }
 
 // Queue stuff ===============================
+
 typedef struct {
     wq_fn work_fn;
     void *data;
@@ -344,36 +347,38 @@ typedef struct {
 typedef struct wq_t {
     // Try keep start and end off the same cache line
     // as they will be owned by different threads.
-    volatile u32 start;
+    i32 volatile start;
     wq_entry_t entries[WQ_SIZE];
-    volatile u32 end;
+    i32 volatile end;
+    i32 volatile remaining_work_count;
     SDL_sem *semaphore;
 } wq_t;
 
 void wqCreate(wq_t *wq, SDL_sem *semaphore)
 {
     wq->start = 0;
-    wq->end = 1;
+    wq->end = 0;
+    wq->remaining_work_count = 0;
     wq->semaphore = semaphore;
 }
 
 b8 wqIsEmpty(wq_t *wq)
 {
-    u32 next_index = (wq->start + 1) % WQ_SIZE;
-    u32 end = wq->end % WQ_SIZE;
-    return next_index == end;
+    return wq->start == wq->end;
 }
 
 b8 wqIsFull(wq_t *wq)
 {
-    return wq->start == wq->end;
+    i32 next_end = (wq->end + 1) % WQ_SIZE;
+    return next_end == wq->start;
 }
 
 b8 wqEnqueue(wq_t *wq, wq_fn work_fn, void *data)
 {
     u32 start = wq->start;
     u32 end = wq->end;
-    if (start == end) {
+    i32 next_end = (end + 1) % WQ_SIZE;
+    if (start == next_end) {
         // Queue is full.
         return 0;
     }
@@ -381,7 +386,8 @@ b8 wqEnqueue(wq_t *wq, wq_fn work_fn, void *data)
     wq_entry_t *entry = wq->entries + end;
     entry->work_fn = work_fn;
     entry->data = data;
-    wq->end = (end + 1) % WQ_SIZE;
+    OSAtomicIncrement32Barrier(&wq->remaining_work_count);
+    wq->end = next_end;
 
     SDL_SemPost(wq->semaphore);
     return 1;
@@ -389,36 +395,29 @@ b8 wqEnqueue(wq_t *wq, wq_fn work_fn, void *data)
 
 b8 wqDequeue(wq_t *wq, wq_entry_t *entry)
 {
-    u32 end = wq->end;
-    u32 next_pos = (wq->start + 1) % WQ_SIZE;
-    if (next_pos == end) {
-        // Queue is empty.
-        return 0;
+    u32 start = wq->start;
+    u32 next_start = (start + 1) % WQ_SIZE;
+
+    while (!wqIsEmpty(wq)) {
+        if (OSAtomicCompareAndSwapIntBarrier(start, next_start, &wq->start)) {
+            wq_entry_t *wq_entry = wq->entries + start;
+            entry->work_fn = wq_entry->work_fn;
+            entry->data = wq_entry->data;
+            return 1;
+        }
     }
 
-    wq_entry_t *wq_entry = wq->entries + next_pos;
-    entry->work_fn = wq_entry->work_fn;
-    entry->data = wq_entry->data;
-    wq->start = next_pos;
-    return 1;
+    return 0;
 }
 
 void wqFinishWork(wq_t *wq)
 {
-    for (;;) {
-        u32 end = wq->end;
-        u32 next_pos = (wq->start + 1) % WQ_SIZE;
-        if (next_pos == end) {
-            // Queue is empty.
-            return;
+    wq_entry_t entry;
+    while (wq->remaining_work_count > 0) {
+        if (wqDequeue(wq, &entry)) {
+            entry.work_fn(entry.data);
+            OSAtomicDecrement32(&wq->remaining_work_count);
         }
-
-        wq_entry_t entry;
-        wq_entry_t *wq_entry = wq->entries + next_pos;
-        entry.work_fn = wq_entry->work_fn;
-        entry.data = wq_entry->data;
-        wq->start = next_pos;
-        entry.work_fn(entry.data);
     }
 }
 
@@ -436,15 +435,16 @@ int thread_fn(void *data)
     thread_info_t *thread_info = (thread_info_t *)data;
     wq_t *work_queue = thread_info->work_queue;
 
-    wq_entry_t work_entry;
+    wq_entry_t entry;
     for (;;) {
-        if (wqIsEmpty(work_queue)) {
-            SDL_SemWait(work_queue->semaphore);
-        }
-        else {
-            wqDequeue(work_queue, &work_entry);
-            work_entry.work_fn(work_entry.data);
-        }
+       if (wqDequeue(work_queue, &entry)) {
+           entry.work_fn(entry.data);
+           OSAtomicDecrement32(&work_queue->remaining_work_count);
+       }
+       else
+       {
+           SDL_SemWait(work_queue->semaphore);
+       }
     }
     return 1;
 }
@@ -483,8 +483,13 @@ int main(void)
 
     SDL_Window *window = SDL_CreateWindow("gg", windoy_pos_x, windoy_pos_y,
                                           window_width, window_height, SDL_WINDOW_RESIZABLE);
-
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+#define VSYNC_ON 0
+#if VSYNC_ON
+    u32 render_flags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
+#else
+    u32 render_flags = SDL_RENDERER_ACCELERATED;
+#endif
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, render_flags);
     u32 frame_buffer_width = 1280;
     u32 frame_buffer_height = 720;
     SDL_Texture *texture = SDL_CreateTexture(

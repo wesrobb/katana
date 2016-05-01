@@ -795,21 +795,13 @@ render_queue_t *render_alloc_queue(memory_arena_t *arena, u32 max_render_queue_s
 }
 
 typedef struct {
-    render_cmd_image_t *cmd;
-    camera_t *camera;
+    render_queue_t *queue;
     game_frame_buffer_t *frame_buffer;
     aabb2i_t clip_rect;
 } render_work_t;
 
-void render_worker(void *data)
-{
-    render_work_t *work = (render_work_t *)data;
-    render_image(work->cmd, work->camera, work->frame_buffer, work->clip_rect);
-}
-
 void render_draw_tile(render_queue_t *queue,
                       game_frame_buffer_t *frame_buffer,
-                      game_work_queues_t *work_queues,
                       aabb2i_t clip_rect)
 {
     START_COUNTER(render_draw_queue);
@@ -842,18 +834,23 @@ void render_draw_tile(render_queue_t *queue,
         }
     }
 
-    // work_queues->finish_work(work_queues->render_work_queue);
     END_COUNTER(render_draw_queue);
+}
+
+void render_worker(void *data)
+{
+    render_work_t *work = (render_work_t *)data;
+    render_draw_tile(work->queue, work->frame_buffer, work->clip_rect);
 }
 
 void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer, game_work_queues_t *work_queues)
 {
 #define WORK_INFO_SIZE 400
- //   render_work_t work_infos[WORK_INFO_SIZE];
- //   u32 work_index = 0;
 
     u32 const tile_y_count = 4;
     u32 const tile_x_count = 4;
+    render_work_t work_infos[tile_y_count * tile_x_count];
+    u32 work_index = 0;
     u32 height = frame_buffer->h;
     u32 width = frame_buffer->w;
     u32 tile_height = height / tile_y_count;
@@ -866,9 +863,16 @@ void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer,
             clip_rect.y_max = clip_rect.y_min + tile_height - 8;
             clip_rect.x_max = clip_rect.x_min + tile_width - 8;
 
-            render_draw_tile(queue, frame_buffer, work_queues, clip_rect);
+            render_work_t *data = work_infos + work_index++;
+            data->queue = queue;
+            data->frame_buffer = frame_buffer;
+            data->clip_rect = clip_rect;
+
+            //render_draw_tile(queue, frame_buffer, work_queues, clip_rect);
+            work_queues->add_work(work_queues->render_work_queue, render_worker, data);
         }
     }
 
+    work_queues->finish_work(work_queues->render_work_queue);
     queue->index = 0;
 }
