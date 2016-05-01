@@ -580,7 +580,7 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
                 basis_t tile_basis = {tile_origin, V2(tilemap->tile_size.x, 0.0f), V2(0.0f, tilemap->tile_size.y)};
                 render_push_image(game_state->render_queue,
                                   &tile_basis,
-                                  V4(1.0f, 1.0f, 1.0f, 0.1f),
+                                  V4(1.0f, 1.0f, 1.0f, 1.0f),
                                   &game_state->tile_image,
                                   0,
                                   &light,

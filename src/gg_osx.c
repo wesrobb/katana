@@ -484,7 +484,7 @@ int main(void)
     SDL_Window *window = SDL_CreateWindow("gg", windoy_pos_x, windoy_pos_y,
                                           window_width, window_height, SDL_WINDOW_RESIZABLE);
 
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     u32 frame_buffer_width = 1280;
     u32 frame_buffer_height = 720;
     SDL_Texture *texture = SDL_CreateTexture(

@@ -502,7 +502,10 @@ render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
     END_COUNTER(render_rotated_block);
 }
 
-static void render_rotated_block(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer)
+static void render_image_naive(render_cmd_image_t *cmd,
+                               camera_t *cam,
+                               game_frame_buffer_t *frame_buffer,
+                               aabb2i_t clip_rect)
 {
     START_COUNTER(render_rotated_block);
     basis_t basis = cmd->header.basis;
@@ -511,12 +514,7 @@ static void render_rotated_block(render_cmd_image_t *cmd, camera_t *cam, game_fr
     v2 x_axis = v2_mul(basis.x_axis, cam->units_to_pixels);
     v2 y_axis = v2_mul(basis.y_axis, cam->units_to_pixels);
 
-    i32 max_width = frame_buffer->w - 1;
-    i32 max_height = frame_buffer->h - 1;
-    i32 x_min = max_width;
-    i32 x_max = 0;
-    i32 y_min = max_height;
-    i32 y_max = 0;
+    aabb2i_t fill_rect = aabb2i_inverted_infinity();
 
     // NOTE(Wes): Find the max rect we could possible draw in regardless
     // of rotation.
@@ -535,33 +533,21 @@ static void render_rotated_block(render_cmd_image_t *cmd, camera_t *cam, game_fr
     for (u32 i = 0; i < 4; ++i) {
         v2i floor_bound = floor_bounds[i];
         v2i ceil_bound = ceil_bounds[i];
-        if (x_min > floor_bound.x) {
-            x_min = floor_bound.x;
+        if (fill_rect.x_min > floor_bound.x) {
+            fill_rect.x_min = floor_bound.x;
         }
-        if (y_min > floor_bound.y) {
-            y_min = floor_bound.y;
+        if (fill_rect.y_min > floor_bound.y) {
+            fill_rect.y_min = floor_bound.y;
         }
-        if (x_max < ceil_bound.x) {
-            x_max = ceil_bound.x;
+        if (fill_rect.x_max < ceil_bound.x) {
+            fill_rect.x_max = ceil_bound.x;
         }
-        if (y_max < ceil_bound.y) {
-            y_max = ceil_bound.y;
+        if (fill_rect.y_max < ceil_bound.y) {
+            fill_rect.y_max = ceil_bound.y;
         }
     }
 
-    // NOTE(Wes): Clip to frame_buffer edges.
-    if (x_min < 0) {
-        x_min = 0;
-    }
-    if (x_max > max_width) {
-        x_max = max_width;
-    }
-    if (y_min < 0) {
-        y_min = 0;
-    }
-    if (y_max < max_height) {
-        y_max = max_height;
-    }
+    fill_rect = aabb2i_intersect(fill_rect, clip_rect);
 
     f32 inv_x_len_sq = 1.0f / v2_len_sq(x_axis);
     f32 inv_y_len_sq = 1.0f / v2_len_sq(y_axis);
@@ -574,110 +560,109 @@ static void render_rotated_block(render_cmd_image_t *cmd, camera_t *cam, game_fr
 
     u8 *fb_data = frame_buffer->data;
     START_COUNTER(process_pixel);
-    for (i32 y = y_min; y <= y_max; y++) {
-        for (i32 x = x_min; x <= x_max; x += 4) {
-            for (i32 i = 0; i < 4; ++i) {
-                // NOTE(Wes): Take the dot product of the point and the axis
-                // perpendicular to the one we are testing to see which side
-                // the point lies on. This code moves the point p in an
-                // anti-clockwise direction.
-                v2 p_orig = v2_sub(V2(x + i, y), origin);
-                f32 u = v2_dot(p_orig, n_x_axis);
-                f32 v = v2_dot(p_orig, n_y_axis);
-                if (u >= 0.0f && u <= 1.0f && v >= 0.0f && v <= 1.0f) {
-                    // TODO(Wes): Actually clamp the texels for subpixel rendering
-                    // rather than just shortening the texture.
-                    f32 texel_x = u * (texture->w - 2.0f);
-                    f32 texel_y = v * (texture->h - 2.0f);
+    for (i32 y = fill_rect.y_min; y < fill_rect.y_max; y++) {
+        for (i32 x = fill_rect.x_min; x < fill_rect.x_max; x++) {
+            // NOTE(Wes): Take the dot product of the point and the axis
+            // perpendicular to the one we are testing to see which side
+            // the point lies on. This code moves the point p in an
+            // anti-clockwise direction.
+            v2 p_orig = v2_sub(V2(x, y), origin);
+            f32 u = v2_dot(p_orig, n_x_axis);
+            f32 v = v2_dot(p_orig, n_y_axis);
+            if (u >= 0.0f && u <= 1.0f && v >= 0.0f && v <= 1.0f) {
+                // TODO(Wes): Actually clamp the texels for subpixel rendering
+                // rather than just shortening the texture.
+                f32 texel_x = u * (texture->w - 2.0f);
+                f32 texel_y = v * (texture->h - 2.0f);
 
-                    u32 texture_x = (u32)texel_x;
-                    u32 texture_y = (u32)texel_y;
+                u32 texture_x = (u32)texel_x;
+                u32 texture_y = (u32)texel_y;
 
-                    // NOTE(Wes): Get the rounded off value of the texel.
-                    f32 fraction_x = texel_x - texture_x;
-                    f32 fraction_y = texel_y - texture_y;
+                // NOTE(Wes): Get the rounded off value of the texel.
+                f32 fraction_x = texel_x - texture_x;
+                f32 fraction_y = texel_y - texture_y;
 
-                    texture_x = kclamp(texture_x, 0, texture->w - 1);
-                    texture_y = kclamp(texture_y, 0, texture->h - 1);
+                texture_x = kclamp(texture_x, 0, texture->w - 1);
+                texture_y = kclamp(texture_y, 0, texture->h - 1);
 
-                    u32 *texel = &texture->data[texture_y * texture->w + texture_x];
+                u32 *texel = &texture->data[texture_y * texture->w + texture_x];
 
-                    // NOTE(Wes): Blend the closest 4 texels for better looking
-                    // pixels. Bilinear blending.
-                    v4 texel_a = read_image_color(*texel);
-                    v4 texel_b = read_image_color(*(texel + 1));
-                    v4 texel_c = read_image_color(*(texel + texture->w));
-                    v4 texel_d = read_image_color(*(texel + texture->w + 1));
+                // NOTE(Wes): Blend the closest 4 texels for better looking
+                // pixels. Bilinear blending.
+                v4 texel_a = read_image_color(*texel);
+                v4 texel_b = read_image_color(*(texel + 1));
+                v4 texel_c = read_image_color(*(texel + texture->w));
+                v4 texel_d = read_image_color(*(texel + texture->w + 1));
 
-                    // NOTE(Wes): Perform gamma correction on pixels
-                    // before blending them to ensure all math is done
-                    // in linear space.
-                    texel_a = srgb_to_linear(texel_a);
-                    texel_b = srgb_to_linear(texel_b);
-                    texel_c = srgb_to_linear(texel_c);
-                    texel_d = srgb_to_linear(texel_d);
+                // NOTE(Wes): Perform gamma correction on pixels
+                // before blending them to ensure all math is done
+                // in linear space.
+                texel_a = srgb_to_linear(texel_a);
+                texel_b = srgb_to_linear(texel_b);
+                texel_c = srgb_to_linear(texel_c);
+                texel_d = srgb_to_linear(texel_d);
 
-                    v4 blended_color = v4_lerp(
-                        v4_lerp(texel_a, texel_b, fraction_x), v4_lerp(texel_c, texel_d, fraction_x), fraction_y);
-                    if (blended_color.a == 0.0f) {
-                        continue;
-                    }
+                v4 blended_color = v4_lerp(
+                    v4_lerp(texel_a, texel_b, fraction_x), v4_lerp(texel_c, texel_d, fraction_x), fraction_y);
+                if (blended_color.a == 0.0f) {
+                    continue;
+                }
 
-                    v3 light_intensity = V3(1.0f, 1.0f, 1.0f);
+                v3 light_intensity = V3(1.0f, 1.0f, 1.0f);
 
 #if 0
-					// NOTE(Wes): If no normals are supplied then we use a default
-					//            normal that points straigh out the screen.
-					// TODO(Wes): Create light volumes out of convex shapes.
-					//            We can then use SAT collision detection to determine
-					//            which entities the light is affecting.
-					v3 normal = V3(0.5f, 0.5f, 1.0f);
-					if (normals) {
-						u32 *normal255 = &normals->data[texture_y * texture->w + texture_x];
-						normal = read_image_color(*normal255).rgb;
-					}
+                // NOTE(Wes): If no normals are supplied then we use a default
+                //            normal that points straigh out the screen.
+                // TODO(Wes): Create light volumes out of convex shapes.
+                //            We can then use SAT collision detection to determine
+                //            which entities the light is affecting.
+                v3 normal = V3(0.5f, 0.5f, 1.0f);
+                if (normals) {
+                    u32 *normal255 = &normals->data[texture_y * texture->w + texture_x];
+                    normal = read_image_color(*normal255).rgb;
+                }
 
-					// Convert the normal from the range 0,1 to -1,1
-					normal = v3_sub(v3_mul(normal, 2.0f), V3(1.0f, 1.0f, 1.0f));
-					normal = v3_normalize(normal);
-					u32 num_lights = cmd->num_lights;
-					v3 light_intensity = V3(0.0f, 0.0f, 0.0f);
-					for (u32 i = 0; i < num_lights; ++i) {
-						light_t *light = &cmd->lights[i];
+                // Convert the normal from the range 0,1 to -1,1
+                normal = v3_sub(v3_mul(normal, 2.0f), V3(1.0f, 1.0f, 1.0f));
+                normal = v3_normalize(normal);
+                u32 num_lights = cmd->num_lights;
+                v3 light_intensity = V3(0.0f, 0.0f, 0.0f);
+                for (u32 i = 0; i < num_lights; ++i) {
+                    light_t *light = &cmd->lights[i];
 
-						v3 light_pos = v3_mul(light->position, cam->units_to_pixels);
-						v3 light_dir = v3_sub(light_pos, V3(x, y, 0.0f)); // TODO(Wes): Objects in the world need a Z depth.
-						f32 light_distance = v3_len(light_dir);
-						light_dir = v3_normalize(light_dir);
+                    v3 light_pos = v3_mul(light->position, cam->units_to_pixels);
+                    v3 light_dir = v3_sub(light_pos, V3(x, y, 0.0f)); // TODO(Wes): Objects in the world need a Z depth.
+                    f32 light_distance = v3_len(light_dir);
+                    light_dir = v3_normalize(light_dir);
 
-						f32 light_factor = v3_dot(normal, light_dir);
-						v3 ambient_color = v3_mul(light->ambient.rgb, light->ambient.a);
-						v3 light_color = v3_mul(light->color.rgb, light->color.a);
-						v3 diffuse = v3_mul(light_color, kmax(light_factor, 0.0f));
+                    f32 light_factor = v3_dot(normal, light_dir);
+                    v3 ambient_color = v3_mul(light->ambient.rgb, light->ambient.a);
+                    v3 light_color = v3_mul(light->color.rgb, light->color.a);
+                    v3 diffuse = v3_mul(light_color, kmax(light_factor, 0.0f));
 
-						f32 attenuation =
-							kclampf(1.0f - (ksq(light_distance) / ksq(light->radius * cam->units_to_pixels)), 0.0f, 1.0f);
-						attenuation *= attenuation;
+                    f32 attenuation =
+                        kclampf(1.0f - (ksq(light_distance) / ksq(light->radius * cam->units_to_pixels)), 0.0f, 1.0f);
+                    attenuation *= attenuation;
 
-						v3 intensity = v3_mul(v3_clamp(v3_add(diffuse, ambient_color), 0.0f, 1.0f), attenuation);
-						light_intensity = v3_add(light_intensity, intensity);
-					}
+                    v3 intensity = v3_mul(v3_clamp(v3_add(diffuse, ambient_color), 0.0f, 1.0f), attenuation);
+                    light_intensity = v3_add(light_intensity, intensity);
+                }
 #endif
 
-                    u32 *fb_pixel = (u32 *)&fb_data[x + (i * GG_BYTES_PP) + y * frame_buffer->pitch];
-                    v4 dest_color = read_frame_buffer_color(*fb_pixel);
+                u32 *fb_pixel = (u32 *)&fb_data[(x * GG_BYTES_PP) + y * frame_buffer->pitch];
+                v4 dest_color = read_frame_buffer_color(*fb_pixel);
 
-                    dest_color = srgb_to_linear(dest_color);
-                    dest_color = linear_blend_tint(blended_color, tint, dest_color);
-                    dest_color = linear_to_srgb(dest_color);
-                    dest_color.rgb = v3_hadamard(dest_color.rgb, light_intensity);
+                dest_color = srgb_to_linear(dest_color);
+                dest_color = linear_blend_tint(blended_color, tint, dest_color);
+                dest_color = linear_to_srgb(dest_color);
+                dest_color.rgb = v3_hadamard(dest_color.rgb, light_intensity);
 
-                    *fb_pixel = color_frame_buffer_u32(dest_color);
-                }
+                *fb_pixel = color_frame_buffer_u32(dest_color);
             }
         }
     }
-    END_COUNTER_N(process_pixel, (y_max - y_min + 1) * (x_max - x_min + 1));
+
+    END_COUNTER_N(process_pixel, aabb2i_clamped_area(fill_rect));
     END_COUNTER(render_rotated_block);
 }
 
@@ -836,7 +821,6 @@ void render_draw_tile(render_queue_t *queue,
             address += sizeof(render_cmd_clear_t);
             break;
         case render_type_image: {
-            // render_rotated_block((render_cmd_block_t *)header, queue->camera, frame_buffer);
 
 
             //        render_work_t *work = work_infos + work_index++;
@@ -848,6 +832,7 @@ void render_draw_tile(render_queue_t *queue,
 
            // clip_rect_t clip_rect = {V2I(5, 5), V2I(250, 250)};
             render_image((render_cmd_image_t *)header, queue->camera, frame_buffer, clip_rect);
+            //render_image_naive((render_cmd_image_t *)header, queue->camera, frame_buffer, clip_rect);
             address += sizeof(render_cmd_image_t);
         } break;
         case render_type_rect:
