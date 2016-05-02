@@ -425,15 +425,15 @@ render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
             fb_pixel_r4i = _mm_cvtps_epi32(_mm_mul_ps(fb_pixel_r4, two_fifty_five4));
 
             // Repack fb_pixels from  aaaa, rrrr, gggg, bbbb to arbg, argb, argb, argb
-            __m128i temp_bg_lo = _mm_unpacklo_epi32(fb_pixel_b4i, fb_pixel_g4i);
-            __m128i temp_bg_hi = _mm_unpackhi_epi32(fb_pixel_b4i, fb_pixel_g4i);
-            __m128i temp_ra_lo = _mm_unpacklo_epi32(fb_pixel_r4i, fb_pixel_a4i);
-            __m128i temp_ra_hi = _mm_unpackhi_epi32(fb_pixel_r4i, fb_pixel_a4i);
+            __m128i temp_br_lo = _mm_unpacklo_epi32(fb_pixel_b4i, fb_pixel_r4i);
+            __m128i temp_br_hi = _mm_unpackhi_epi32(fb_pixel_b4i, fb_pixel_r4i);
+            __m128i temp_ga_lo = _mm_unpacklo_epi32(fb_pixel_g4i, fb_pixel_a4i);
+            __m128i temp_ga_hi = _mm_unpackhi_epi32(fb_pixel_g4i, fb_pixel_a4i);
 
-            __m128i fb_pixel_0 = _mm_unpacklo_epi32(temp_bg_lo, temp_ra_lo);
-            __m128i fb_pixel_1 = _mm_unpackhi_epi32(temp_bg_lo, temp_ra_lo);
-            __m128i fb_pixel_2 = _mm_unpacklo_epi32(temp_bg_hi, temp_ra_hi);
-            __m128i fb_pixel_3 = _mm_unpackhi_epi32(temp_bg_hi, temp_ra_hi);
+            __m128i fb_pixel_0 = _mm_unpacklo_epi32(temp_br_lo, temp_ga_lo);
+            __m128i fb_pixel_1 = _mm_unpackhi_epi32(temp_br_lo, temp_ga_lo);
+            __m128i fb_pixel_2 = _mm_unpacklo_epi32(temp_br_hi, temp_ga_hi);
+            __m128i fb_pixel_3 = _mm_unpackhi_epi32(temp_br_hi, temp_ga_hi);
 
             // Squash the ARGB values down to 32 bits in each SSE "slot"
             // eg. 000b 000g 000r 000a -> bgra bgra bgra bgra
@@ -788,7 +788,7 @@ void render_draw_tile(render_queue_t *queue,
             break;
         case render_type_image:
             render_image((render_cmd_image_t *)header, queue->camera, frame_buffer, clip_rect);
-            //render_image_naive((render_cmd_image_t *)header, queue->camera, frame_buffer, clip_rect);
+            // render_image_naive((render_cmd_image_t *)header, queue->camera, frame_buffer, clip_rect);
             address += sizeof(render_cmd_image_t);
             break;
         case render_type_rect:
@@ -809,8 +809,8 @@ void render_worker(void *data)
 
 void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer, game_work_queues_t *work_queues)
 {
-    u32 const tile_y_count = 4;
-    u32 const tile_x_count = 4;
+    u32 const tile_y_count = 8;
+    u32 const tile_x_count = 8;
     render_work_t work_infos[tile_y_count * tile_x_count];
     u32 work_index = 0;
     u32 height = frame_buffer->h;

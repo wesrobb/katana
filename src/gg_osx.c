@@ -449,7 +449,7 @@ int thread_fn(void *data)
     return 1;
 }
 // TODO Read the core count to set the thread count.
-#define WORKER_THREAD_COUNT 4
+#define WORKER_THREAD_COUNT 8
 // ===========================================
 
 int main(void)
