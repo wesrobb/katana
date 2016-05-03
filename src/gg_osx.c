@@ -6,7 +6,6 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <mach-o/dyld.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -16,6 +15,7 @@
 #include <unistd.h>
 #include <xmmintrin.h>
 #include <libkern/OSAtomic.h>
+#include <stdlib.h>
 
 #define Kilobytes(Value) ((Value)*1024LL)
 #define Megabytes(Value) (Kilobytes(Value) * 1024LL)
@@ -492,7 +492,11 @@ int main(void)
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, render_flags);
     u32 frame_buffer_width = 1920;
     u32 frame_buffer_height = 1080;
-    u8 *pixels = (u8 *)malloc(frame_buffer_width * frame_buffer_height * GG_BYTES_PP);
+
+    // Ensure our frame buffer is on a 16 byte boundary so we can use it with SSE intructions.
+    u32 frame_buffer_size = frame_buffer_width * frame_buffer_height * GG_BYTES_PP;
+    u8 *pixels = (u8 *)malloc(frame_buffer_size);
+    assert(pixels & 15 == 0);
     SDL_Texture *texture = SDL_CreateTexture(
         renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, frame_buffer_width, frame_buffer_height);
 

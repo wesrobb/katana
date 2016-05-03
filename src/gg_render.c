@@ -217,18 +217,28 @@ render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
 
     // Align the 4px write to x_max and write mask overwrite on x_min boundary.
     __m128i start_clip_mask = _mm_set1_epi32(0xFFFFFFFF);
-    __m128i clip_mask_table[3];
-    clip_mask_table[0] = _mm_setr_epi32(0, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF);
-    clip_mask_table[1] = _mm_setr_epi32(0, 0, 0xFFFFFFFF, 0xFFFFFFFF);
-    clip_mask_table[2] = _mm_setr_epi32(0, 0, 0, 0xFFFFFFFF);
-    u32 fill_width = fill_rect.x_max - fill_rect.x_min;
-    u32 fill_width_align = fill_width & 3;
-    if (fill_width_align > 0) {
-        const i32 adjustment = 4 - fill_width_align;
-        fill_width += adjustment;
-        fill_rect.x_min = fill_rect.x_max - fill_width;
+    __m128i end_clip_mask = _mm_set1_epi32(0xFFFFFFFF);
+    __m128i start_clip_masks[3];
+    start_clip_masks[0] = _mm_setr_epi32(0, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF);
+    start_clip_masks[1] = _mm_setr_epi32(0, 0, 0xFFFFFFFF, 0xFFFFFFFF);
+    start_clip_masks[2] = _mm_setr_epi32(0, 0, 0, 0xFFFFFFFF);
+    __m128i end_clip_masks[3];
+    end_clip_masks[0] = _mm_setr_epi32(0xFFFFFFFF, 0, 0, 0);
+    end_clip_masks[1] = _mm_setr_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0, 0);
+    end_clip_masks[2] = _mm_setr_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0);
 
-        start_clip_mask = clip_mask_table[adjustment - 1];
+    // Align fill x values to 4 pixel boundaries
+    // and mask off pixels that should not be drawn
+    i32 x_min_align = fill_rect.x_min & 3;
+    if (x_min_align) {
+        fill_rect.x_min = fill_rect.x_min & ~3;
+        start_clip_mask = start_clip_masks[x_min_align - 1];
+    }
+
+    i32 x_max_align = fill_rect.x_max & 3;
+    if (x_max_align) {
+        fill_rect.x_max = (fill_rect.x_max & ~3) + 4;
+        end_clip_mask = end_clip_masks[x_max_align - 1];
     }
 
 
@@ -288,6 +298,7 @@ render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
                 _mm_castps_si128(_mm_and_ps(_mm_and_ps(u4_ge_zero, u4_le_one), _mm_and_ps(v4_ge_zero, v4_le_one)));
 
             write_mask = _mm_and_si128(write_mask, clip_mask);
+
 #if 0
             if (m128i_access(write_mask, 0) == 0 && m128i_access(write_mask, 1) == 0 &&
                 m128i_access(write_mask, 2) == 0 && m128i_access(write_mask, 3) == 0) {
@@ -398,8 +409,7 @@ render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
                                            _mm_add_ps(_mm_mul_ps(texel_b_b4, c2), _mm_mul_ps(texel_a_b4, c3)));
 
             __m128i *fb_pixel = (__m128i *)&fb_data[(x * GG_BYTES_PP) + y * frame_buffer->pitch];
-            // TODO(Wes): Align our framebuffer on the 16 byte boundary
-            __m128i fb_pixel_packed = _mm_loadu_si128(fb_pixel);
+            __m128i fb_pixel_packed = _mm_load_si128(fb_pixel);
 
             // Convert current value in framebuffer to rrrr, gggg, bbbb, aaaa
             __m128i fb_pixel_b4i = _mm_and_si128(texel_mask, fb_pixel_packed);
@@ -456,7 +466,13 @@ render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
 
             __m128i masked_out = _mm_or_si128(_mm_and_si128(write_mask, out),
                                               _mm_andnot_si128(write_mask, fb_pixel_packed));
-            clip_mask = _mm_set1_epi32(0xFFFFFFFF);
+
+            if ((x + 8) > fill_rect.x_max) {
+                clip_mask = end_clip_mask;
+            }
+            else {
+                clip_mask = _mm_set1_epi32(0xFFFFFFFF);
+            }
 
 #ifdef GG_DEBUG
             pixel_t pixels[4];
@@ -470,7 +486,7 @@ render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_
             }
 #endif
 
-            _mm_storeu_si128(fb_pixel, masked_out);
+            _mm_store_si128(fb_pixel, masked_out);
         }
     }
     END_COUNTER_N(process_pixel, aabb2i_clamped_area(fill_rect));
@@ -809,33 +825,39 @@ void render_worker(void *data)
 
 void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer, game_work_queues_t *work_queues)
 {
-    u32 const tile_y_count = 8;
-    u32 const tile_x_count = 8;
+    assert(((uintptr_t)frame_buffer->data & 15) == 0);
+    u32 const tile_y_count = 4;
+    u32 const tile_x_count = 4;
+
+    u32 fb_width = frame_buffer->w;
+    u32 fb_height = frame_buffer->h;
+
+    u32 tile_height = fb_height / tile_y_count;
+    u32 tile_width = fb_width / tile_x_count;
+
+    // Round tile_width to the nearest multiple of 4 because we always render 4 pixel at a time.
+    tile_width = ((tile_width + 3) / 4) * 4;
+
     render_work_t work_infos[tile_y_count * tile_x_count];
     u32 work_index = 0;
-    u32 height = frame_buffer->h;
-    u32 width = frame_buffer->w;
-    u32 tile_height = height / tile_y_count;
-    u32 tile_width = width / tile_x_count;
     for (u32 y = 0; y < tile_y_count; ++y) {
         for (u32 x = 0; x < tile_x_count; ++x) {
             aabb2i_t clip_rect;
-            clip_rect.y_min = y * tile_height + 4;
-            clip_rect.x_min = x * tile_width + 4;
-            clip_rect.y_max = clip_rect.y_min + tile_height - 8;
-            clip_rect.x_max = clip_rect.x_min + tile_width - 8;
+            clip_rect.y_min = y * tile_height;
+            clip_rect.x_min = x * tile_width;
+            clip_rect.y_max = clip_rect.y_min + tile_height;
+            clip_rect.x_max = clip_rect.x_min + tile_width;
+
+            if (clip_rect.x_max > (i32)fb_width) {
+                clip_rect.x_max = fb_width;
+            }
 
             render_work_t *data = work_infos + work_index++;
             data->queue = queue;
             data->frame_buffer = frame_buffer;
             data->clip_rect = clip_rect;
 
-            clip_rect.y_min = 0;
-            clip_rect.x_min = 0;
-            clip_rect.y_max = 1080;
-            clip_rect.x_max = 1920;
-
-            //render_draw_tile(queue, frame_buffer, clip_rect);
+            //render_worker(queue, frame_buffer, clip_rect);
             work_queues->add_work(work_queues->render_work_queue, render_worker, data);
         }
     }

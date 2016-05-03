@@ -1,7 +1,7 @@
-CC = gcc
-CFLAGS = -Wall -Werror -std=c11 -msse4 -fPIC -ffast-math 
+CC = clang
+CFLAGS = -Wall -Werror -msse4 -fPIC -ffast-math -std=c11 
 RELEASE_FLAGS = -O2 -g
-DEBUG_FLAGS = -O0 -g -ggdb
+DEBUG_FLAGS = -O0 -g
 DEFINES = -DGG_INTERNAL -DGAME_DLL=gg.so -DGAME_TEMP_DLL=gg_temp.so
 DEFINES_D = -DGG_DEBUG -DGG_INTERNAL -DGAME_DLL=gg_d.so -DGAME_TEMP_DLL=gg_temp_d.so 
 DISABLED_WARNINGS = -Wno-unused-function -Wno-unused-variable -Wno-missing-braces -Wno-format-security
