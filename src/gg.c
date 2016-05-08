@@ -38,7 +38,7 @@ static void output_sine_wave(game_state_t *game_state, game_audio_t *audio)
 static unsigned char *get_tile(tilemap_t *tilemap, u32 x, u32 y)
 {
     assert(tilemap);
-    if(x >= tilemap->tiles_wide || y >= tilemap->tiles_high) {
+    if (x >= tilemap->tiles_wide || y >= tilemap->tiles_high) {
         return 0;
     }
 
@@ -146,25 +146,23 @@ static b8 is_tile_empty(unsigned char *tile)
     return *tile == 0;
 }
 
-static b8 test_wall(f32 test_x, 
-                    f32 test_y, 
-                    f32 wall_x, 
-                    f32 wall_y_min, 
-                    f32 wall_y_max, 
-                    f32 move_delta_x, 
-                    f32 move_delta_y, 
-                    f32* t_min)
+static b8 test_wall(f32 test_x,
+                    f32 test_y,
+                    f32 wall_x,
+                    f32 wall_y_min,
+                    f32 wall_y_max,
+                    f32 move_delta_x,
+                    f32 move_delta_y,
+                    f32 *t_min)
 {
     if (move_delta_x == 0.0f) {
         return 0;
     }
 
     f32 t = (wall_x - test_x) / move_delta_x;
-    if (t >= 0.0f && t < *t_min)
-    {
-        f32 y = test_y + t*move_delta_y;
-        if (y >= wall_y_min && y <= wall_y_max)
-        {
+    if (t >= 0.0f && t < *t_min) {
+        f32 y = test_y + t * move_delta_y;
+        if (y >= wall_y_min && y <= wall_y_max) {
             const f32 t_epsilon = 0.001f;
             *t_min = t - t_epsilon;
             return 1;
@@ -231,18 +229,7 @@ static void update_entities(game_state_t *game_state, game_input_t *input, log_f
         // Gravity
         // new_accel = v2_add(new_accel, world->gravity);
 
-        // NOTE(Wes): We always ray cast 4 times for movement:
-        // If we are moving left we cast left from the left side at the
-        // top and bottom of the entity, vice versa
-        // for
-        // right.
-        // If we are moving down we cast down from the bottom side at
-        // the left and right of the entity, vice
-        // versa for
-        // up.
-
         // Friction force. USE ODE here!
-        //v2 friction = V2(entity->velocity_factor * entity->velocity.x, 0.0f);
         v2 friction = v2_mul(entity->velocity, entity->velocity_factor);
         new_accel = v2_add(new_accel, friction);
 
@@ -271,9 +258,8 @@ static void update_entities(game_state_t *game_state, game_input_t *input, log_f
         //            Check that the intended position of the player is on a tile that is empty.
         //            Otherwise find the closest position to the edge of the tile and continue
         //            velocity from that point in a direction that is "safe".
-        v2 min_pos = V2(kmin(new_entity_pos.x, entity->position.x), 
-                        kmin(new_entity_pos.y, entity->position.y));
-        v2 max_pos = V2(kmax(new_entity_pos.x + entity->size.x, entity->position.x + entity->size.x), 
+        v2 min_pos = V2(kmin(new_entity_pos.x, entity->position.x), kmin(new_entity_pos.y, entity->position.y));
+        v2 max_pos = V2(kmax(new_entity_pos.x + entity->size.x, entity->position.x + entity->size.x),
                         kmax(new_entity_pos.y + entity->size.y, entity->position.y + entity->size.y));
 
         tilemap_t *tilemap = &world->tilemap;
@@ -283,9 +269,8 @@ static void update_entities(game_state_t *game_state, game_input_t *input, log_f
         u32 max_tile_y = (u32)(max_pos.y / (tilemap->tile_size.y)) + 1;
 
         f32 t_remaining = 1.0f; // Full movement has occurred at time = 1.0f.
-        for (u32 collision_iter = 0; collision_iter < 4 && t_remaining > 0.0f; collision_iter++)
-        {
-            f32 t_min = 1.0f; 
+        for (u32 collision_iter = 0; collision_iter < 4 && t_remaining > 0.0f; collision_iter++) {
+            f32 t_min = 1.0f;
             v2 wall_normal = {0}; // Used to glide the player off the wall using his existing velocity.
             // NOTE(Wes): We use != to check against the max tile to get around integer overflow
             //            when reaching edge of the tilemap.
@@ -305,46 +290,46 @@ static void update_entities(game_state_t *game_state, game_input_t *input, log_f
 
                         // Test left wall
                         if (test_wall(entity->position.x,
-                            entity->position.y,
-                            max_corner.x,
-                            min_corner.y,
-                            max_corner.y,
-                            pos_delta.x,
-                            pos_delta.y,
-                            &t_min)) {
+                                      entity->position.y,
+                                      max_corner.x,
+                                      min_corner.y,
+                                      max_corner.y,
+                                      pos_delta.x,
+                                      pos_delta.y,
+                                      &t_min)) {
                             wall_normal = V2(1.0f, 0.0f);
                         }
                         // Test right wall
                         if (test_wall(entity->position.x,
-                            entity->position.y,
-                            min_corner.x,
-                            min_corner.y,
-                            max_corner.y,
-                            pos_delta.x,
-                            pos_delta.y,
-                            &t_min)) {
+                                      entity->position.y,
+                                      min_corner.x,
+                                      min_corner.y,
+                                      max_corner.y,
+                                      pos_delta.x,
+                                      pos_delta.y,
+                                      &t_min)) {
                             wall_normal = V2(-1.0f, 0.0f);
                         }
                         // Test bottom wall
                         if (test_wall(entity->position.y,
-                            entity->position.x,
-                            max_corner.y,
-                            min_corner.x,
-                            max_corner.x,
-                            pos_delta.y,
-                            pos_delta.x,
-                            &t_min)) {
+                                      entity->position.x,
+                                      max_corner.y,
+                                      min_corner.x,
+                                      max_corner.x,
+                                      pos_delta.y,
+                                      pos_delta.x,
+                                      &t_min)) {
                             wall_normal = V2(0.0f, 1.0f);
                         }
                         // Test top wall
                         if (test_wall(entity->position.y,
-                            entity->position.x,
-                            min_corner.y,
-                            min_corner.x,
-                            max_corner.x,
-                            pos_delta.y,
-                            pos_delta.x,
-                            &t_min)) {
+                                      entity->position.x,
+                                      min_corner.y,
+                                      min_corner.x,
+                                      max_corner.x,
+                                      pos_delta.y,
+                                      pos_delta.x,
+                                      &t_min)) {
                             wall_normal = V2(0.0f, -1.0f);
                         }
                     }
@@ -503,13 +488,33 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
 
     v2 min_pos = V2(FLT_MAX, FLT_MAX);
     v2 max_pos = V2(FLT_MIN, FLT_MIN);
-    b8 tracked_pos_found = 0;
 
-    min_pos = V2(0, 0);
+    for (u32 i = 0; i < GG_MAX_CONTROLLERS; ++i) {
+        u32 controlled_entity = game_state->world.controlled_entities[i];
+        if (controlled_entity) {
+            entity_t *entity = &game_state->world.entities[controlled_entity];
+            if (entity->type == entity_type_player) {
+                if (entity->position.x < min_pos.x) {
+                    min_pos.x = entity->position.x;
+                }
+                if (entity->position.y < min_pos.y) {
+                    min_pos.y = entity->position.y;
+                }
+                if (entity->position.x > max_pos.x) {
+                    max_pos.x = entity->position.x;
+                }
+                if (entity->position.y > max_pos.y) {
+                    max_pos.y = entity->position.y;
+                }
+            }
+        }
+    }
+
+    // min_pos = V2(0, 0);
     tilemap_t *tilemap = &game_state->world.tilemap;
-    max_pos = V2(tilemap->tile_size.x * tilemap->tiles_wide, tilemap->tile_size.y * tilemap->tiles_high);
+    // max_pos = V2(tilemap->tile_size.x * tilemap->tiles_wide, tilemap->tile_size.y * tilemap->tiles_high);
 
-    v2 camera_edge_buffer = V2(0.0f, 0.0f);
+    v2 camera_edge_buffer = V2(10.0f, 10.0f);
     min_pos = v2_sub(min_pos, camera_edge_buffer);
     max_pos = v2_add(max_pos, camera_edge_buffer);
     v2 new_camera_pos = v2_div(v2_add(min_pos, max_pos), 2.0f);
@@ -518,47 +523,11 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
     game_state->world.camera.position =
         v2_add(v2_mul(game_state->world.camera.position, (1.0f - (input->delta_time * cam_move_speed))),
                v2_mul(new_camera_pos, (input->delta_time * cam_move_speed)));
+    game_state->world.camera.position = new_camera_pos;
 
-    v2 screen_span = v2_sub(v2_add(max_pos, camera_edge_buffer), min_pos);
-    f32 x_units_to_pixels = frame_buffer->w / screen_span.x;
-    f32 y_units_to_pixels = frame_buffer->h / screen_span.y;
-
-    f32 units_to_pixels = x_units_to_pixels < y_units_to_pixels ? x_units_to_pixels : y_units_to_pixels;
-    game_state->world.camera.units_to_pixels = units_to_pixels;
-
-    // TODO(Wes): Fix camera zoom rounding errors.
-    f32 cam_zoom_speed = 0.0f;
-    game_state->world.camera.units_to_pixels =
-        (game_state->world.camera.units_to_pixels * (1.0f - (input->delta_time * cam_zoom_speed))) +
-        (units_to_pixels * (input->delta_time * cam_zoom_speed));
-
-#if 0
-    // Clamp draw offset.
-    f32 units_to_pixels = x_units_to_pixels < y_units_to_pixels
-                              ? x_units_to_pixels
-                              : y_units_to_pixels;
-    if (game_state->world.camera.position.x < 0.0f) {
-        game_state->world.camera.position.x = 0.0;
-    } else if (game_state->world.camera.position.x +
-                   frame_buffer->width / units_to_pixels >=
-               32 * game_state->world.tilemap.tile_size.x) {
-        game_state->world.camera.position.x =
-            (32 * game_state->world.tilemap.tile_size.x) -
-            frame_buffer->width / units_to_pixels;
-    }
-    if (game_state->world.camera.position.y < 0.0f) {
-        game_state->world.camera.position.y = 0.0;
-    } else if (game_state->world.camera.position.y +
-                   frame_buffer->height / units_to_pixels >=
-               18 * game_state->world.tilemap.tile_size.y) {
-        game_state->world.camera.position.y =
-            (18 * game_state->world.tilemap.tile_size.y) -
-            frame_buffer->height / units_to_pixels;
-    }
-#endif
     // NOTE(Wes): Start by clearing the screen.
     render_push_clear(game_state->render_queue, COLOR(1.0f, 0.5f, 0.5f, 0.5f));
-    //render_push_clear(game_state->render_queue, COLOR(1.0f, 1.0f, 0.0f, 0.0f));
+    // render_push_clear(game_state->render_queue, COLOR(1.0f, 1.0f, 0.0f, 0.0f));
     game_state->elapsed_time += input->delta_time;
     f32 angle = game_state->elapsed_time * 0.5f;
     v2 light_origin = v2_mul(V2(kcosf(angle), ksinf(angle)), 10);
@@ -573,13 +542,13 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
     v2 background_pos = V2(0.0f, 0.0f);
     v2 background_size = V2(128.0f, 72.0f);
     basis_t background_basis = {background_pos, V2(background_size.x, 0.0f), V2(0.0f, background_size.y)};
-   // render_push_rotated_block(game_state->render_queue,
-   //                           &background_basis,
-   //                           V4(1.0f, 1.0f, 1.0f, 1.0f),
-   //                           &game_state->background_image,
-   //                           0,
-   //                           &light,
-   //                           1);
+    render_push_image(game_state->render_queue,
+                      &background_basis,
+                      V4(1.0f, 1.0f, 1.0f, 1.0f),
+                      &game_state->background_image,
+                      0,
+                      &light,
+                      1);
     for (u32 i = 0; i < 18; ++i) {
         for (u32 j = 0; j < 32; ++j) {
             if (tilemap->tiles[j + i * tilemap->tiles_wide]) {

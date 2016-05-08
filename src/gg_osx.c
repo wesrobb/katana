@@ -489,14 +489,15 @@ int main(void)
 #else
     u32 render_flags = SDL_RENDERER_ACCELERATED;
 #endif
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, render_flags);
     u32 frame_buffer_width = 1920;
     u32 frame_buffer_height = 1080;
+    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, render_flags);
+    SDL_RenderSetLogicalSize(renderer, frame_buffer_width, frame_buffer_height);
 
     // Ensure our frame buffer is on a 16 byte boundary so we can use it with SSE intructions.
     u32 frame_buffer_size = frame_buffer_width * frame_buffer_height * GG_BYTES_PP;
     u8 *pixels = (u8 *)malloc(frame_buffer_size);
-    assert(pixels & 15 == 0);
+    assert(((uintptr_t)pixels & 15) == 0);
     SDL_Texture *texture = SDL_CreateTexture(
         renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, frame_buffer_width, frame_buffer_height);
 
@@ -675,6 +676,7 @@ int main(void)
         //SDL_UnlockTexture(texture);
         SDL_UpdateTexture(texture, 0, pixels, frame_buffer.pitch);
 
+        SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, texture, 0, 0);
         SDL_RenderPresent(renderer);
 

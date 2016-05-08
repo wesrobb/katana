@@ -1,0 +1,14 @@
+-x
+c
+-DGAME_DLL=gg.so
+-DGAME_TEMP_DLL=gg_temp.so
+-DGG_INTERNAL
+-I/usr/local/include
+-I/usr/local/include/SDL2
+-Wall
+-Werror
+-Wno-format-security
+-Wno-missing-braces
+-Wno-unused-function
+-Wno-unused-variable
+-std=c11
