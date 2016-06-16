@@ -12,3 +12,4 @@ c
 -Wno-unused-function
 -Wno-unused-variable
 -std=c11
+-isystem/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.11.sdk/usr/include
