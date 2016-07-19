@@ -129,4 +129,8 @@ typedef struct {
     i32 tone_hz;
     // TODO(Wes): Just for testing rotated rectangle rendering.
     f32 elapsed_time;
+
+#ifdef GG_EDITOR
+    b8 editor_enabled;
+#endif
 } game_state_t;

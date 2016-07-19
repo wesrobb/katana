@@ -226,6 +226,11 @@ static void osx_handle_keyup(SDL_Keycode key, game_controller_input_t *old_input
     case SDLK_SPACE:
         osx_process_keyup(&(old_input->action_down), &(new_input->action_down));
         break;
+#ifdef GG_EDITOR
+    case SDLK_e:
+        osx_process_keyup(&(old_input->editor_mode), &(new_input->editor_mode));
+        break;
+#endif
     }
 }
 
@@ -254,6 +259,11 @@ static void osx_handle_keydown(SDL_Keycode key, game_controller_input_t *old_inp
     case SDLK_SPACE:
         osx_process_keydown(&(old_input->action_down), &(new_input->action_down));
         break;
+#ifdef GG_EDITOR
+    case SDLK_e:
+        osx_process_keydown(&(old_input->editor_mode), &(new_input->editor_mode));
+        break;
+#endif
     }
 }
 

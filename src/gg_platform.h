@@ -137,7 +137,7 @@ typedef struct {
     f32 right_stick_y;
 
     union {
-        game_button_state_t Buttons[12];
+        game_button_state_t buttons[12];
         struct {
             game_button_state_t move_up;
             game_button_state_t move_down;
@@ -156,6 +156,9 @@ typedef struct {
             game_button_state_t start;
 
             game_button_state_t terminator;
+#ifdef GG_EDITOR
+            game_button_state_t editor_mode;
+#endif
         };
     };
 } game_controller_input_t;

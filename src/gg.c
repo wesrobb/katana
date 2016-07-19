@@ -52,73 +52,6 @@ static unsigned char *get_tile_from_world_pos(tilemap_t *tilemap, v2 pos)
     return get_tile(tilemap, tile_x, tile_y);
 }
 
-typedef struct {
-    f32 intersect;
-    b8 did_intersect;
-} ray_cast_result;
-
-static ray_cast_result ray_cast_vertical(v2 origin, f32 end_y, tilemap_t *tilemap)
-{
-    ray_cast_result result;
-    f32 tile_width = tilemap->tile_size.x;
-    f32 tile_height = tilemap->tile_size.y;
-    i32 tilemap_start_y = (i32)origin.y / (i32)tile_height;
-    i32 tilemap_x = (i32)origin.x / (i32)tile_width;
-    i32 tilemap_end_y = (i32)end_y / (i32)tile_height;
-
-    for (i32 i = tilemap_start_y; i <= tilemap_end_y; ++i) {
-        if (*get_tile(tilemap, tilemap_x, i)) {
-            result.intersect = i * tile_height;
-            result.did_intersect = 1;
-            return result;
-        }
-    }
-    for (i32 i = tilemap_start_y - 1; i >= tilemap_end_y; --i) {
-        if (*get_tile(tilemap, tilemap_x, i)) {
-            result.intersect = (i + 1) * tile_height;
-            result.did_intersect = 1;
-            return result;
-        }
-    }
-    // No intersect found if we get here so just set it to as far as
-    // requested.
-    result.intersect = end_y;
-    result.did_intersect = 0;
-    return result;
-}
-
-static ray_cast_result ray_cast_horizontal(v2 origin, f32 end_x, tilemap_t *tilemap)
-{
-    ray_cast_result result;
-    f32 tile_width = tilemap->tile_size.x;
-    f32 tile_height = tilemap->tile_size.y;
-    i32 tilemap_start_x = (i32)origin.x / (i32)tile_width;
-    i32 tilemap_y = (i32)origin.y / (i32)tile_height;
-    i32 tilemap_end_x = (i32)end_x / (i32)tile_width;
-
-    for (i32 i = tilemap_start_x; i <= tilemap_end_x; ++i) {
-        unsigned char *tile = get_tile(tilemap, i, tilemap_y);
-        if (*tile) {
-            result.intersect = i * tile_width;
-            result.did_intersect = 1;
-            return result;
-        }
-    }
-    for (i32 i = tilemap_start_x - 1; i >= tilemap_end_x; --i) {
-        unsigned char *tile = get_tile(tilemap, i, tilemap_y);
-        if (*tile) {
-            result.intersect = (i + 1) * tile_width;
-            result.did_intersect = 1;
-            return result;
-        }
-    }
-    // No intersect found if we get here so just set it to as far as
-    // requested.
-    result.intersect = end_x;
-    result.did_intersect = 0;
-    return result;
-}
-
 static u32 get_next_entity(entity_t *entities)
 {
     static const entity_t zero_entity = {0};
@@ -406,7 +339,7 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
     assert(sizeof(game_state_t) <= memory->permanent_store_size);
     game_state_t *game_state = (game_state_t *)memory->permanent_store;
     if (!memory->is_initialized) {
-        game_state->world.camera.units_to_pixels = 10.0f / 1.0f;
+        game_state->world.camera.units_to_pixels = 15.0f / 1.0f;
         game_state->world.camera.position.x = 0.0f;
         game_state->world.camera.position.y = 0.0f;
         game_state->world.gravity.x = 0.0f;
@@ -459,6 +392,15 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
 
         memory->is_initialized = 1;
     }
+
+#ifdef GG_EDITOR
+    for (u32 i = 0; i < GG_MAX_CONTROLLERS; ++i) {
+        game_controller_input_t *controller = &input->controllers[i];
+        if (controller->editor_mode.ended_down) {
+            game_state->editor_enabled = !game_state->editor_enabled;
+        }
+    }
+#endif
 
     // NOTE(Wes): Check for controller based entity spawn.
     for (u32 i = 0; i < GG_MAX_CONTROLLERS; ++i) {
