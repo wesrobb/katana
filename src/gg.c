@@ -505,6 +505,7 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
                                   0,
                                   &light,
                                   1);
+                render_push_hollow_rect(game_state->render_queue, &tile_basis, COLOR(1.0f, 0.0f, 1.0f, 1.0f), 0.1f);
             }
         }
     }
@@ -535,10 +536,10 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
     }
 
 #if 1
-    v2 o = {{60.0f, 26.0f}};
-    v2 x = {{20.0f, 2.0f}};
+    v2 o = {{60.0f, 36.0f}};
+    v2 x = {{25.0f, -6.0f}};
     v2 y = v2_perp(x);
-    v2 o2 = {{70.0f, 30.0f}};
+    v2 o2 = {{30.0f, 30.0f}};
     v2 x2 = {{10.0f, 0.0f}};
     v2 y2 = v2_perp(x2);
     basis_t line1_basis = {o, x, y};
@@ -550,8 +551,8 @@ DLL_FN void game_update_and_render(game_memory_t *memory,
         line_color2 = COLOR(1.0f, 0.0f, 1.0f, 0.0f);
     }
 
-    render_push_rect(game_state->render_queue, &line1_basis, V2(0, 0), V2(0, 0), 5.0f, line_color1);
-    render_push_rect(game_state->render_queue, &line2_basis, V2(0, 0), V2(0, 0), 5.0f, line_color2);
+    render_push_hollow_rect(game_state->render_queue, &line1_basis, line_color1, 0.2f);
+    render_push_hollow_rect(game_state->render_queue, &line2_basis, line_color2, 0.5f);
 #endif
     render_draw_queue(game_state->render_queue, frame_buffer, work_queues);
 

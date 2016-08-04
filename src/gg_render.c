@@ -35,10 +35,8 @@ typedef struct {
 
 typedef struct {
     render_cmd_header_t header;
-    v2 start;
-    v2 end;
-    f32 width;
     v4 color;
+    f32 border_size;
 } render_cmd_rect_t;
 
 static inline v4 read_frame_buffer_color(u32 buffer)
@@ -152,8 +150,7 @@ typedef struct {
 } pixel_t;
 #endif
 
-static void
-render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer, aabb2i_t clip_rect)
+static void render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buffer_t *frame_buffer, aabb2i_t clip_rect)
 {
     START_COUNTER(render_image);
     basis_t basis = cmd->header.basis;
@@ -664,6 +661,14 @@ static void render_rect(render_cmd_rect_t *cmd, camera_t *cam, game_frame_buffer
     v2 origin = v2_mul(basis.origin, cam->units_to_pixels);
     v2 x_axis = v2_mul(basis.x_axis, cam->units_to_pixels);
     v2 y_axis = v2_mul(basis.y_axis, cam->units_to_pixels);
+    f32 border_size = cmd->border_size * cam->units_to_pixels;
+
+    v2 hollow_origin = V2(origin.x + border_size, origin.y + border_size);
+    f32 hollow_x_len = v2_len(x_axis) - border_size * 2;
+    v2 hollow_x_axis = v2_mul(v2_normalize(x_axis), hollow_x_len);
+    f32 hollow_y_len = v2_len(y_axis) - border_size * 2;
+    v2 hollow_y_axis = v2_mul(v2_normalize(y_axis), hollow_y_len);
+
 
     aabb2i_t fill_rect = aabb2i_inverted_infinity();
 
@@ -707,20 +712,52 @@ static void render_rect(render_cmd_rect_t *cmd, camera_t *cam, game_frame_buffer
     v2 n_x_axis = v2_mul(x_axis, inv_x_len_sq);
     v2 n_y_axis = v2_mul(y_axis, inv_y_len_sq);
 
+    f32 hollow_inv_x_len_sq = 1.0f / v2_len_sq(hollow_x_axis);
+    f32 hollow_inv_y_len_sq = 1.0f / v2_len_sq(hollow_y_axis);
+    v2 hollow_n_x_axis = v2_mul(hollow_x_axis, hollow_inv_x_len_sq);
+    v2 hollow_n_y_axis = v2_mul(hollow_y_axis, hollow_inv_y_len_sq);
+
     v4 color = cmd->color;
-    u8 *fb_data = frame_buffer->data;
-    for (i32 y = fill_rect.y_min; y < fill_rect.y_max; y++) {
-        for (i32 x = fill_rect.x_min; x < fill_rect.x_max; x++) {
-            v2 p_orig = v2_sub(V2(x, y), origin);
-            f32 u = v2_dot(p_orig, n_x_axis);
-            f32 v = v2_dot(p_orig, n_y_axis);
-            if (u >= 0.0f && u <= 1.0f && v >= 0.0f && v <= 1.0f) {
-                u32 *fb_pixel = (u32 *)&fb_data[(x * GG_BYTES_PP) + y * frame_buffer->pitch];
-                v4 dest_color = read_frame_buffer_color(*fb_pixel);
-                dest_color = srgb_to_linear(dest_color);
-                dest_color = linear_blend(color, dest_color);
-                dest_color = linear_to_srgb(dest_color);
-                *fb_pixel = color_frame_buffer_u32(dest_color);
+    if (border_size > 0.0f)
+    {
+        u8 *fb_data = frame_buffer->data;
+        for (i32 y = fill_rect.y_min; y < fill_rect.y_max; y++) {
+            for (i32 x = fill_rect.x_min; x < fill_rect.x_max; x++) {
+                v2 p_orig = v2_sub(V2(x, y), origin);
+                f32 u = v2_dot(p_orig, n_x_axis);
+                f32 v = v2_dot(p_orig, n_y_axis);
+                if (u >= 0.0f && u <= 1.0f && v >= 0.0f && v <= 1.0f) {
+                    v2 hollow_orig = v2_sub(V2(x, y), hollow_origin);
+                    f32 hollow_u = v2_dot(hollow_orig, hollow_n_x_axis);
+                    f32 hollow_v = v2_dot(hollow_orig, hollow_n_y_axis);
+                    if (!(hollow_u >= 0.0f && hollow_u <= 1.0f && hollow_v >= 0.0f && hollow_v <= 1.0f)) {
+                        u32 *fb_pixel = (u32 *)&fb_data[(x * GG_BYTES_PP) + y * frame_buffer->pitch];
+                        v4 dest_color = read_frame_buffer_color(*fb_pixel);
+                        dest_color = srgb_to_linear(dest_color);
+                        dest_color = linear_blend(color, dest_color);
+                        dest_color = linear_to_srgb(dest_color);
+                        *fb_pixel = color_frame_buffer_u32(dest_color);
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        u8 *fb_data = frame_buffer->data;
+        for (i32 y = fill_rect.y_min; y < fill_rect.y_max; y++) {
+            for (i32 x = fill_rect.x_min; x < fill_rect.x_max; x++) {
+                v2 p_orig = v2_sub(V2(x, y), origin);
+                f32 u = v2_dot(p_orig, n_x_axis);
+                f32 v = v2_dot(p_orig, n_y_axis);
+                if (u >= 0.0f && u <= 1.0f && v >= 0.0f && v <= 1.0f) {
+                    u32 *fb_pixel = (u32 *)&fb_data[(x * GG_BYTES_PP) + y * frame_buffer->pitch];
+                    v4 dest_color = read_frame_buffer_color(*fb_pixel);
+                    dest_color = srgb_to_linear(dest_color);
+                    dest_color = linear_blend(color, dest_color);
+                    dest_color = linear_to_srgb(dest_color);
+                    *fb_pixel = color_frame_buffer_u32(dest_color);
+                }
             }
         }
     }
@@ -763,15 +800,22 @@ void render_push_image(render_queue_t *queue,
     cmd->num_lights = num_lights;
 }
 
-void render_push_rect(render_queue_t *queue, basis_t *basis, v2 start, v2 end, f32 width, v4 color)
+void render_push_rect(render_queue_t *queue, basis_t *basis, v4 color)
 {
     render_cmd_rect_t *cmd = (render_cmd_rect_t *)render_push_cmd(queue, sizeof(render_cmd_rect_t));
     cmd->header.type = render_type_rect;
     cmd->header.basis = *basis;
-    cmd->start = start;
-    cmd->end = end;
-    cmd->width = width;
     cmd->color = color;
+    cmd->border_size = 0.0f;
+}
+
+void render_push_hollow_rect(render_queue_t *queue, basis_t *basis, v4 color, f32 border_size)
+{
+    render_cmd_rect_t *cmd = (render_cmd_rect_t *)render_push_cmd(queue, sizeof(render_cmd_rect_t));
+    cmd->header.type = render_type_rect;
+    cmd->header.basis = *basis;
+    cmd->color = color;
+    cmd->border_size = border_size;
 }
 
 render_queue_t *render_alloc_queue(memory_arena_t *arena, u32 max_render_queue_size, camera_t *cam)

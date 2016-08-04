@@ -27,7 +27,12 @@ void render_push_image(render_queue_t *queue,
                        light_t *lights,
                        int num_lights);
 
-void render_push_rect(render_queue_t *queue, basis_t *basis, v2 start, v2 end, f32 width, v4 color);
+// Renders the a rect at the start (top, left) of the specified size and color.
+void render_push_rect(render_queue_t *queue, basis_t *basis, v4 color);
+
+// Renders the a rect at the start (top, left) of the specified size and color.
+// It will be hollow and have a border of the specified size.
+void render_push_hollow_rect(render_queue_t *queue, basis_t *basis, v4 color, f32 border_size);
 
 // Allocates a render queue.
 render_queue_t *render_alloc_queue(memory_arena_t *arena, u32 max_render_queue_size, camera_t *cam);
