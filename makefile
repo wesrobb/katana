@@ -24,6 +24,7 @@ SDL_LIB = SDL2
 BUILD_DIR = build
 
 .PHONY: release debug
+all: release debug
 release: $(BUILD_DIR) $(BIN_TARGET) $(GAME_TARGET) tags cscope.out
 debug: $(BUILD_DIR) $(BIN_TARGET_D) $(GAME_TARGET_D) tags cscope.out
 
