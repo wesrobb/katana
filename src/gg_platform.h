@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdatomic.h>
 #include <limits.h>
 
 #ifdef _MSC_VER
@@ -68,6 +69,7 @@ typedef int64_t i64;
 typedef uint64_t u64;
 typedef float f32;
 typedef double f64;
+typedef atomic_int atomic_i32;
 
 enum {
     dbg_counter_game_update_and_render,

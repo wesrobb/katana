@@ -14,8 +14,8 @@
 #include <time.h>
 #include <unistd.h>
 #include <xmmintrin.h>
-#include <libkern/OSAtomic.h>
 #include <stdlib.h>
+#include <stdatomic.h>
 
 #define Kilobytes(Value) ((Value)*1024LL)
 #define Megabytes(Value) (Kilobytes(Value) * 1024LL)
@@ -357,10 +357,10 @@ typedef struct {
 typedef struct wq_t {
     // Try keep start and end off the same cache line
     // as they will be owned by different threads.
-    i32 volatile start;
+    atomic_i32 start;
     wq_entry_t entries[WQ_SIZE];
-    i32 volatile end;
-    i32 volatile remaining_work_count;
+    atomic_i32 end;
+    atomic_i32 remaining_work_count;
     SDL_sem *semaphore;
 } wq_t;
 
@@ -385,8 +385,8 @@ b8 wqIsFull(wq_t *wq)
 
 b8 wqEnqueue(wq_t *wq, wq_fn work_fn, void *data)
 {
-    u32 start = wq->start;
-    u32 end = wq->end;
+    i32 start = wq->start;
+    i32 end = wq->end;
     i32 next_end = (end + 1) % WQ_SIZE;
     if (start == next_end) {
         // Queue is full.
@@ -396,7 +396,7 @@ b8 wqEnqueue(wq_t *wq, wq_fn work_fn, void *data)
     wq_entry_t *entry = wq->entries + end;
     entry->work_fn = work_fn;
     entry->data = data;
-    OSAtomicIncrement32Barrier(&wq->remaining_work_count);
+    atomic_fetch_add(&wq->remaining_work_count, 1);
     wq->end = next_end;
 
     SDL_SemPost(wq->semaphore);
@@ -405,11 +405,10 @@ b8 wqEnqueue(wq_t *wq, wq_fn work_fn, void *data)
 
 b8 wqDequeue(wq_t *wq, wq_entry_t *entry)
 {
-    u32 start = wq->start;
-    u32 next_start = (start + 1) % WQ_SIZE;
-
     while (!wqIsEmpty(wq)) {
-        if (OSAtomicCompareAndSwapIntBarrier(start, next_start, &wq->start)) {
+        i32 start = wq->start;
+        i32 next_start = (start + 1) % WQ_SIZE;
+        if (atomic_compare_exchange_weak(&wq->start, &start, next_start)) {
             wq_entry_t *wq_entry = wq->entries + start;
             entry->work_fn = wq_entry->work_fn;
             entry->data = wq_entry->data;
@@ -426,7 +425,7 @@ void wqFinishWork(wq_t *wq)
     while (wq->remaining_work_count > 0) {
         if (wqDequeue(wq, &entry)) {
             entry.work_fn(entry.data);
-            OSAtomicDecrement32(&wq->remaining_work_count);
+            atomic_fetch_sub(&wq->remaining_work_count, 1);
         }
     }
 }
@@ -449,7 +448,7 @@ int thread_fn(void *data)
     for (;;) {
        if (wqDequeue(work_queue, &entry)) {
            entry.work_fn(entry.data);
-           OSAtomicDecrement32(&work_queue->remaining_work_count);
+           atomic_fetch_sub(&work_queue->remaining_work_count, 1);
        }
        else
        {
