@@ -4,6 +4,7 @@
     <ClInclude Include="..\..\..\src\gg_platform.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\gg_windows.c" />
+    <ClCompile Include="..\..\..\src\gg_platform.c" />
+    <ClCompile Include="..\..\..\src\gg_platform_windows.c" />
   </ItemGroup>
 </Project>

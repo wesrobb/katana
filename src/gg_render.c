@@ -254,8 +254,8 @@ static void render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buff
     u32 texture_height = texture->h;
     __m128i texture_width4 = _mm_set1_epi32(texture_width);
     __m128i texture_height4 = _mm_set1_epi32(texture_height);
-    __m128i texture_width4f = _mm_cvtepi32_ps(texture_width4);
-    __m128i texture_height4f = _mm_cvtepi32_ps(texture_height4);
+    __m128 texture_width4f = _mm_cvtepi32_ps(texture_width4);
+    __m128 texture_height4f = _mm_cvtepi32_ps(texture_height4);
     image_t *normals = cmd->normals;
 
     __m128 zero4 = _mm_setzero_ps();
@@ -870,8 +870,8 @@ void render_worker(void *data)
 void render_draw_queue(render_queue_t *queue, game_frame_buffer_t *frame_buffer, game_work_queues_t *work_queues)
 {
     assert(((uintptr_t)frame_buffer->data & 15) == 0);
-    u32 const tile_y_count = 4;
-    u32 const tile_x_count = 4;
+    #define tile_y_count 4
+    #define tile_x_count 4
 
     u32 fb_width = frame_buffer->w;
     u32 fb_height = frame_buffer->h;
