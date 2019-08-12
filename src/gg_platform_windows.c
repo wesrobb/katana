@@ -35,15 +35,15 @@ static void copy_file(char *existing_file_path, char *new_file_path)
 
 static void atomic_increment(i32 volatile *value)
 {
-    InterlockedIncrement(value);
+    InterlockedIncrement((long volatile *)value);
 }
 
 static void atomic_decrement(i32 volatile *value)
 {
-    InterlockedDecrement(value);
+    InterlockedDecrement((long volatile *)value);
 }
 
 static i32 atomic_cas(i32 volatile *destination, i32 new_value, i32 comparand)
 {
-    return InterlockedCompareExchange(destination, new_value, comparand);
+    return InterlockedCompareExchange((long volatile *)destination, new_value, comparand);
 }

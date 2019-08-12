@@ -476,10 +476,10 @@ static void render_image(render_cmd_image_t *cmd, camera_t *cam, game_frame_buff
             u8 *debug_out = (u8 *)&masked_out;
             u32 mask_index = 0;
             for (u32 i = 0; i < 4; ++i) {
-                pixels[i].b = masked_out[mask_index++];
-                pixels[i].g = masked_out[mask_index++];
-                pixels[i].r = masked_out[mask_index++];
-                pixels[i].a = masked_out[mask_index++];
+                pixels[i].b = debug_out[mask_index++];
+                pixels[i].g = debug_out[mask_index++];
+                pixels[i].r = debug_out[mask_index++];
+                pixels[i].a = debug_out[mask_index++];
             }
 #endif
 

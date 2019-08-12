@@ -62,15 +62,18 @@ static game_lib_paths_t get_game_lib_paths()
     else
     {
         // TODO(Wes) : Handle failure to get exe path.
+		return;
     }
 
     size_t base_path_len = strnlen(base_path, 1024);
     static char lib_path[1024] = {0};
-    strncpy(lib_path, base_path, base_path_len + 1);
+    strncpy(lib_path, base_path, base_path_len);
+	lib_path[1023] = 0;
     strcat(lib_path, "gg_game.dll");
 
     static char temp_lib_path[1024] = {0};
-    strncpy(temp_lib_path, base_path, base_path_len + 1);
+    strncpy(temp_lib_path, base_path, base_path_len);
+	temp_lib_path[1023] = 0;
     strcat(temp_lib_path, "gg_game_temp.dll");
 
     game_lib_paths_t game_lib_paths;
@@ -254,7 +257,7 @@ static void handle_keyup(SDL_Keycode key,
         break;
 #ifdef GG_EDITOR
     case SDLK_e:
-        osx_process_keyup(&(old_input->editor_mode), &(new_input->editor_mode));
+        process_keyup(&(old_input->editor_mode), &(new_input->editor_mode));
         break;
 #endif
     }
@@ -289,7 +292,7 @@ static void handle_keydown(SDL_Keycode key,
         break;
 #ifdef GG_EDITOR
     case SDLK_e:
-        osx_process_keydown(&(old_input->editor_mode), &(new_input->editor_mode));
+        process_keydown(&(old_input->editor_mode), &(new_input->editor_mode));
         break;
 #endif
     }
